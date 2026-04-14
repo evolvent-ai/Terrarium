@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.DS_Store
+.venv/
+*.egg-info/
+dist/
+.pytest_cache/
+.env
+outputs/
+authorized_user.json
+oauth_credentials.json
+.claude/

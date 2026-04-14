@@ -1,0 +1,7 @@
+[metadata]
+name = "branch_and_loop"
+author = "terrarium"
+difficulty = "hard"
+category = "personal_assistant"
+tags = ["multi-capability", "email", "notion", "calendar", "workspace", "branching", "loop"]
+description = "Agent helps Alex prepare for an RL final exam: checking email, organizing study notes in Notion, managing calendar events, and handling schedule changes."

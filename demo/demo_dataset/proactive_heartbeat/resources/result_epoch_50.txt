@@ -1,0 +1,9 @@
+Experiment: PPO on CartPole-v1
+Epoch: 50
+Mean reward: 187.3
+Std reward: 42.1
+Episodes: 500
+Status: training
+
+Notes: Agent is learning but not yet solving the environment.
+Reward trending upward. No signs of instability.

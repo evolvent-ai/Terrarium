@@ -1,0 +1,7 @@
+job_name = "demo"
+datasets = ["demo/demo_dataset"]
+n_attempts = 1
+n_concurrent_trials = 1
+
+[[agents]]
+name = "claude_code"

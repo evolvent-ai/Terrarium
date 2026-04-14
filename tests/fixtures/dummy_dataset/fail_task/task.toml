@@ -1,0 +1,6 @@
+[metadata]
+name = "fail_task"
+author = "test"
+difficulty = "easy"
+category = "test"
+description = "Partially fails"

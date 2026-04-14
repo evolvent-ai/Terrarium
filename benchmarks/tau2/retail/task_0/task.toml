@@ -1,0 +1,7 @@
+[metadata]
+name = "retail_task_0"
+author = "tau2-bench"
+difficulty = "hard"
+category = "retail"
+tags = ["tau2", "retail", "exchange"]
+description = "Exchange items in a delivered order (tau2-bench retail task 0)"
