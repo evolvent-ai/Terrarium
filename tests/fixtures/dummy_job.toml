@@ -1,0 +1,8 @@
+job_name = "dummy_test"
+datasets = ["tests/fixtures/dummy_dataset"]
+n_attempts = 1
+n_concurrent_trials = 1
+
+[[agents]]
+name = "dummy"
+import_path = "tests.fixtures.dummy_agent:DummyAgent"

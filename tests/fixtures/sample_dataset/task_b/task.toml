@@ -1,0 +1,7 @@
+[metadata]
+name = "task_b"
+author = "test"
+difficulty = "medium"
+category = "test"
+tags = ["test"]
+description = "Task B"

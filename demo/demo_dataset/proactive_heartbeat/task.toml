@@ -1,0 +1,7 @@
+[metadata]
+name = "proactive_heartbeat"
+author = "terrarium"
+difficulty = "medium"
+category = "personal_assistant"
+tags = ["heartbeat", "proactive", "email", "workspace", "monitoring"]
+description = "Agent monitors workspace for new experiment results on periodic heartbeat signals, emailing summaries when new files appear."

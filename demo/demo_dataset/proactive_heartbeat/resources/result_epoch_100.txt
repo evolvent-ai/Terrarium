@@ -1,0 +1,9 @@
+Experiment: PPO on CartPole-v1
+Epoch: 100
+Mean reward: 498.2
+Std reward: 5.7
+Episodes: 500
+Status: solved
+
+Notes: Agent has solved the environment (reward > 495).
+Training converged. Ready for evaluation on harder environments.

@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terrarium Viewer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+/* ── Reset & Base ── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  line-height: 1.6;
+  overflow-x: hidden;
+  --bg-deep: 0 0 0;
+  --bg-surface: 0 0 0;
+  --bg-collapsed: 17 17 17;
+  --accent-primary: 76 84 236;
+  --accent-secondary: 124 132 246;
+  --text-primary: 250 250 250;
+  --text-secondary: 136 136 136;
+  --border: 255 255 255;
+  background: rgb(var(--bg-deep));
+  color: rgb(var(--text-primary));
+  transition: background 0.3s ease, color 0.3s ease;
+}
+body.light {
+  --bg-deep: 255 255 255;
+  --bg-surface: 255 255 255;
+  --bg-collapsed: 245 245 245;
+  --accent-primary: 7 14 176;
+  --accent-secondary: 44 52 204;
+  --text-primary: 10 10 10;
+  --text-secondary: 85 85 85;
+  --border: 0 0 0;
+}
+
+/* ── Layout ── */
+.app { display: flex; height: 100vh; }
+.sidebar {
+  width: 320px; min-width: 320px;
+  background: rgb(var(--bg-surface));
+  border-right: 1px solid rgb(var(--border) / 0.08);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.sidebar-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid rgb(var(--border) / 0.08);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.sidebar-header h2 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px; font-weight: 500;
+  color: rgb(var(--text-secondary));
+  text-transform: uppercase; letter-spacing: 1.5px;
+}
+.theme-toggle {
+  width: 32px; height: 32px; border-radius: 8px;
+  border: 1px solid rgb(var(--border) / 0.12);
+  background: transparent; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; color: rgb(var(--text-secondary));
+  transition: all 0.2s ease;
+}
+.theme-toggle:hover {
+  border-color: rgb(var(--accent-primary) / 0.5);
+  color: rgb(var(--text-primary));
+}
+.trial-list { flex: 1; overflow-y: auto; }
+
+/* Overview item in sidebar */
+.sidebar-overview {
+  padding: 12px 24px;
+  border-bottom: 1px solid rgb(var(--border) / 0.08);
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex; align-items: center; gap: 8px;
+}
+.sidebar-overview:hover { background: rgb(var(--border) / 0.04); }
+.sidebar-overview.active {
+  background: rgb(var(--accent-primary) / 0.08);
+  border-left-color: rgb(var(--accent-primary));
+}
+.sidebar-overview .icon { font-size: 14px; }
+.sidebar-overview .text {
+  font-size: 13px; font-weight: 500;
+  color: rgb(var(--text-primary));
+}
+
+.trial-item {
+  padding: 14px 24px;
+  border-bottom: 1px solid rgb(var(--border) / 0.06);
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.trial-item:hover { background: rgb(var(--border) / 0.04); }
+.trial-item.active {
+  background: rgb(var(--accent-primary) / 0.08);
+  border-left-color: rgb(var(--accent-primary));
+}
+.trial-item .name {
+  font-size: 13px; font-weight: 500;
+  color: rgb(var(--text-primary));
+  word-break: break-all;
+}
+.trial-item .meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; color: rgb(var(--text-secondary));
+  margin-top: 6px; display: flex; gap: 12px; align-items: center;
+}
+.main { flex: 1; overflow-y: scroll; padding: 0 40px 32px; position: relative; }
+.main > .section:first-child { padding-top: 32px; }
+.main.switching { opacity: 0; }
+.main { transition: opacity 0.1s ease; }
+
+/* ── Drop Zone ── */
+#drop-zone {
+  display: flex; align-items: center; justify-content: center;
+  height: 100vh; width: 100%;
+}
+#drop-zone-inner {
+  border: 1px dashed rgb(var(--border) / 0.18);
+  border-radius: 16px; padding: 64px 80px; text-align: center;
+  transition: all 0.3s ease;
+}
+#drop-zone-inner.drag-over {
+  border-color: rgb(var(--accent-primary));
+  background: rgb(var(--accent-primary) / 0.04);
+}
+#drop-zone-inner h2 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 28px; font-weight: 300; letter-spacing: -0.5px;
+  color: rgb(var(--text-primary));
+}
+#drop-zone-inner p {
+  margin-top: 12px; font-size: 14px; color: rgb(var(--text-secondary));
+}
+#drop-zone-inner a {
+  color: rgb(var(--accent-primary));
+  cursor: pointer; text-decoration: underline;
+  text-decoration-color: rgb(var(--accent-primary) / 0.5);
+  text-underline-offset: 4px;
+}
+.app.hidden, #drop-zone.hidden { display: none; }
+input[type="file"] { display: none; }
+
+/* ── Score Bar ── */
+.score-bar {
+  height: 4px; background: rgb(var(--border) / 0.08);
+  border-radius: 2px; margin-top: 8px; overflow: hidden;
+}
+.score-bar-fill { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
+
+/* ── Overview ── */
+.overview { margin-bottom: 32px; }
+.overview h1 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 28px; font-weight: 300; letter-spacing: -0.5px;
+  color: rgb(var(--text-primary)); margin-bottom: 8px;
+}
+.overview-meta {
+  display: flex; gap: 20px; flex-wrap: wrap;
+  font-size: 13px; color: rgb(var(--text-secondary)); margin-bottom: 20px;
+}
+.overview-meta strong { color: rgb(var(--text-primary)); }
+
+/* ── Cards ── */
+.cards {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px; margin-bottom: 24px;
+}
+.card {
+  background: rgb(var(--bg-surface));
+  padding: 16px 20px; border-radius: 12px;
+  border: 1px solid rgb(var(--border) / 0.08);
+  transition: all 0.2s ease;
+}
+.card:hover { border-color: rgb(var(--accent-primary) / 0.3); }
+.card-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; color: rgb(var(--text-secondary));
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.card-value {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 24px; font-weight: 600;
+  color: rgb(var(--text-primary)); margin-top: 4px;
+}
+.card-value.pass { color: #34d399; }
+.card-value.fail { color: #f87171; }
+.card-value.warn { color: #fbbf24; }
+
+/* ── Stats ── */
+.stats-section { margin-bottom: 24px; }
+.stats-group {
+  background: rgb(var(--bg-surface));
+  border: 1px solid rgb(var(--border) / 0.08);
+  border-radius: 12px; padding: 20px; margin-bottom: 12px;
+  transition: border-color 0.2s ease;
+}
+.stats-group:hover { border-color: rgb(var(--border) / 0.15); }
+.stats-group h3 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px; font-weight: 500;
+  color: rgb(var(--text-primary)); margin-bottom: 14px;
+}
+.stats-metrics { display: flex; gap: 12px; flex-wrap: wrap; }
+.stats-metric {
+  background: rgb(var(--bg-deep));
+  padding: 10px 16px; border-radius: 8px;
+  border: 1px solid rgb(var(--border) / 0.06);
+}
+.stats-metric .label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; color: rgb(var(--text-secondary));
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.stats-metric .value {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 18px; font-weight: 600; color: rgb(var(--text-primary));
+}
+
+/* ── Section ── */
+.section { margin-bottom: 32px; }
+.section h2 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 16px; font-weight: 500; letter-spacing: -0.2px;
+  color: rgb(var(--text-primary)); margin-bottom: 16px;
+  padding-bottom: 10px; border-bottom: 1px solid rgb(var(--border) / 0.08);
+}
+.section h3 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px; font-weight: 500;
+  color: rgb(var(--text-secondary));
+  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;
+}
+
+/* ── Info Grid ── */
+.info-grid {
+  display: grid; grid-template-columns: 120px 1fr;
+  gap: 6px 16px; font-size: 13px;
+}
+.info-grid .label { color: rgb(var(--text-secondary)); }
+.info-grid .value { color: rgb(var(--text-primary)); word-break: break-all; }
+
+/* ── Checks ── */
+.checks { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.check {
+  font-family: 'JetBrains Mono', monospace;
+  padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 500;
+  border: 1px solid transparent;
+}
+.check.pass { background: rgb(52 211 153 / 0.12); color: #34d399; border-color: rgb(52 211 153 / 0.2); }
+.check.fail { background: rgb(248 113 113 / 0.12); color: #f87171; border-color: rgb(248 113 113 / 0.2); }
+
+/* ── Timing ── */
+.timing-bars { display: flex; flex-direction: column; gap: 10px; }
+.timing-row { display: flex; align-items: center; gap: 16px; font-size: 13px; }
+.timing-label {
+  width: 90px; color: rgb(var(--text-secondary));
+  text-align: right; font-size: 12px;
+}
+.timing-bar {
+  flex: 1; height: 24px; background: rgb(var(--border) / 0.06);
+  border-radius: 6px; overflow: hidden;
+}
+.timing-bar-fill {
+  height: 100%; border-radius: 6px;
+  display: flex; align-items: center; padding: 0 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; color: #fff; white-space: nowrap;
+  transition: width 0.4s ease;
+}
+.timing-bar-fill.setup { background: rgb(var(--accent-primary)); }
+.timing-bar-fill.exec { background: #34d399; }
+.timing-bar-fill.total { background: rgb(var(--text-secondary) / 0.6); }
+
+/* ── Exception ── */
+.exception-box {
+  background: rgb(248 113 113 / 0.06);
+  border: 1px solid rgb(248 113 113 / 0.15);
+  border-radius: 12px; padding: 18px; margin-bottom: 12px;
+}
+.exception-type {
+  font-family: 'JetBrains Mono', monospace;
+  color: #f87171; font-weight: 600; font-size: 13px;
+}
+.exception-msg { color: rgb(var(--text-primary)); margin-top: 6px; font-size: 14px; }
+.exception-tb { margin-top: 10px; }
+
+/* ── Messages ── */
+.message {
+  margin: 10px 0; padding: 18px 20px; border-radius: 12px;
+  border: 1px solid rgb(var(--border) / 0.08);
+  transition: border-color 0.2s ease;
+}
+.message:hover { border-color: rgb(var(--border) / 0.15); }
+.message.user {
+  background: rgb(var(--bg-surface));
+  border-left: 3px solid rgb(var(--accent-primary));
+}
+.message.assistant {
+  background: rgb(var(--bg-deep));
+  border-left: 3px solid #34d399;
+}
+.role {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;
+}
+.role.user { color: rgb(var(--accent-primary)); }
+.role.assistant { color: #34d399; }
+.role.tool { color: #fbbf24; }
+.message.tool {
+  background: rgb(var(--bg-surface));
+  border-left: 3px solid #fbbf24;
+}
+.block { margin: 10px 0; }
+.block-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; color: rgb(var(--text-secondary));
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;
+}
+.text-content { white-space: pre-wrap; word-break: break-word; font-size: 14px; line-height: 1.7; }
+.md-content { font-size: 14px; line-height: 1.7; word-break: break-word; }
+.md-content p { margin: 8px 0; }
+.md-content h1, .md-content h2, .md-content h3, .md-content h4 {
+  font-family: 'Space Grotesk', sans-serif;
+  margin: 16px 0 8px; font-weight: 600;
+}
+.md-content h1 { font-size: 20px; }
+.md-content h2 { font-size: 17px; }
+.md-content h3 { font-size: 15px; }
+.md-content ul, .md-content ol { padding-left: 24px; margin: 8px 0; }
+.md-content li { margin: 4px 0; }
+.md-content code {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  background: rgb(var(--bg-collapsed)); padding: 2px 6px; border-radius: 4px;
+}
+.md-content pre { margin: 8px 0; }
+.md-content pre code { background: none; padding: 0; }
+.md-content blockquote {
+  border-left: 3px solid rgb(var(--border) / 0.15);
+  padding-left: 14px; margin: 8px 0;
+  color: rgb(var(--text-secondary));
+}
+.md-content a { color: rgb(var(--accent-primary)); text-decoration: underline; text-underline-offset: 3px; }
+.md-content table { border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+.md-content th, .md-content td {
+  border: 1px solid rgb(var(--border) / 0.12);
+  padding: 6px 12px; text-align: left;
+}
+.md-content th { font-weight: 600; background: rgb(var(--bg-collapsed)); }
+.md-content hr { border: none; border-top: 1px solid rgb(var(--border) / 0.08); margin: 16px 0; }
+.thinking {
+  background: rgb(var(--bg-collapsed));
+  padding: 14px 16px; border-radius: 8px;
+  border: 1px dashed rgb(var(--border) / 0.12);
+  color: rgb(var(--text-secondary)); font-style: italic; font-size: 13px; line-height: 1.7;
+  max-height: 300px; overflow-y: auto;
+}
+.tool-use {
+  background: rgb(var(--bg-collapsed));
+  padding: 14px 16px; border-radius: 8px;
+  border: 1px solid rgb(var(--border) / 0.08);
+}
+.tool-name {
+  font-family: 'JetBrains Mono', monospace;
+  color: rgb(var(--accent-secondary)); font-weight: 600; font-size: 13px;
+}
+.tool-result {
+  background: rgb(var(--bg-collapsed));
+  padding: 14px 16px; border-radius: 8px;
+  border: 1px solid rgb(var(--border) / 0.08);
+}
+pre {
+  background: rgb(var(--bg-collapsed));
+  padding: 14px 16px; border-radius: 8px; overflow-x: auto;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: rgb(var(--text-primary));
+  border: 1px solid rgb(var(--border) / 0.06);
+  line-height: 1.6;
+  max-height: 400px; overflow-y: auto;
+}
+.stage-label {
+  font-family: 'Space Grotesk', sans-serif;
+  background: rgb(var(--accent-primary));
+  color: #fff; padding: 6px 18px; border-radius: 20px;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.5px;
+  margin: 28px 0 14px; display: inline-block;
+}
+.collapsible {
+  cursor: pointer; user-select: none;
+  transition: color 0.15s ease;
+}
+.collapsible:hover { color: rgb(var(--text-primary)); }
+.collapsible::before {
+  content: '\25B6'; display: inline-block; margin-right: 8px;
+  font-size: 9px; transition: transform 0.2s ease; transform: rotate(90deg);
+}
+.collapsible.collapsed::before { transform: rotate(0deg); }
+.collapsible-content { display: block; }
+.collapsible-content.collapsed { display: none; }
+
+/* ── Stage Nav ── */
+.stage-nav {
+  position: sticky; top: -1px; z-index: 10;
+  background: rgb(var(--bg-deep) / 0.95);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgb(var(--border) / 0.08);
+  padding: 12px 40px;
+  margin: 0 -40px 20px;
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+}
+.stage-nav-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; color: rgb(var(--text-secondary));
+  text-transform: uppercase; letter-spacing: 1px;
+  margin-right: 4px;
+}
+.stage-nav-item {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; font-weight: 500;
+  padding: 4px 14px; border-radius: 14px;
+  border: 1px solid rgb(var(--border) / 0.12);
+  color: rgb(var(--text-secondary));
+  cursor: pointer; transition: all 0.15s ease;
+  background: transparent;
+}
+.stage-nav-item:hover {
+  border-color: rgb(var(--accent-primary) / 0.5);
+  color: rgb(var(--text-primary));
+}
+.stage-nav-item.active {
+  background: rgb(var(--accent-primary));
+  border-color: rgb(var(--accent-primary));
+  color: #fff;
+}
+
+/* ── Divider ── */
+.divider {
+  border: none; border-top: 1px solid rgb(var(--border) / 0.08);
+  margin: 28px 0;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgb(var(--border) / 0.12); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--border) / 0.2); }
+</style>
+</head>
+<body>
+
+<div id="drop-zone">
+  <button class="theme-toggle" onclick="toggleTheme()" style="position:fixed;top:20px;right:20px" id="drop-zone-toggle"></button>
+  <div id="drop-zone-inner">
+    <h2>Terrarium Viewer</h2>
+    <p style="margin-top: 12px; font-size: 14px;">Drop a <strong>result.json</strong> here</p>
+    <p style="margin-top: 6px; font-size: 13px;">Job or Trial level &mdash; or <label for="file-input"><a>browse files</a></label></p>
+    <input type="file" id="file-input" accept=".json">
+  </div>
+</div>
+
+<div class="app hidden" id="app">
+  <div class="sidebar" id="sidebar"></div>
+  <div class="main" id="main"></div>
+</div>
+
+<script>
+const dropZone = document.getElementById('drop-zone');
+const dropInner = document.getElementById('drop-zone-inner');
+const fileInput = document.getElementById('file-input');
+const app = document.getElementById('app');
+const sidebar = document.getElementById('sidebar');
+const main = document.getElementById('main');
+
+let jobData = null;
+let trialResults = [];
+let currentView = 'overview'; // 'overview' | index number
+
+// Theme
+function toggleTheme() {
+  document.body.classList.toggle('light');
+  localStorage.setItem('terrarium-theme', document.body.classList.contains('light') ? 'light' : 'dark');
+  updateThemeIcons();
+  if (trialResults.length) {
+    renderSidebar();
+    updateSidebarActive();
+  }
+}
+// Restore saved theme
+if (localStorage.getItem('terrarium-theme') === 'light') {
+  document.body.classList.add('light');
+}
+function updateThemeIcons() {
+  const icon = document.body.classList.contains('light') ? '\u263E' : '\u2600';
+  const dzToggle = document.getElementById('drop-zone-toggle');
+  if (dzToggle) dzToggle.textContent = icon;
+}
+updateThemeIcons();
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropInner.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropInner.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropInner.classList.remove('drag-over'); handleFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+
+// Keyboard navigation
+document.addEventListener('keydown', e => {
+  if (!trialResults.length) return;
+  if (e.key === 'ArrowDown' || e.key === 'j') {
+    e.preventDefault();
+    if (currentView === 'overview') selectTrial(0);
+    else if (currentView < trialResults.length - 1) selectTrial(currentView + 1);
+  } else if (e.key === 'ArrowUp' || e.key === 'k') {
+    e.preventDefault();
+    if (typeof currentView === 'number' && currentView > 0) selectTrial(currentView - 1);
+    else if (jobData) showOverview();
+  } else if (e.key === 'Escape') {
+    if (jobData) showOverview();
+  }
+});
+
+function handleFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      loadData(data);
+    } catch(err) { alert('Invalid JSON: ' + err.message); }
+  };
+  reader.readAsText(file);
+}
+
+function loadData(data) {
+  if (data.trial_results) {
+    jobData = data;
+    trialResults = data.trial_results;
+  } else if (data.trajectory) {
+    jobData = null;
+    trialResults = [data];
+  } else {
+    alert('Unrecognized result.json format');
+    return;
+  }
+  dropZone.classList.add('hidden');
+  app.classList.remove('hidden');
+  renderSidebar();
+  if (jobData) {
+    showOverview();
+  } else {
+    selectTrial(0);
+  }
+}
+
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+
+function fmtDuration(sec) {
+  if (sec == null) return '-';
+  if (sec < 1) return `${(sec * 1000).toFixed(0)}ms`;
+  if (sec < 60) return `${sec.toFixed(1)}s`;
+  return `${Math.floor(sec / 60)}m ${(sec % 60).toFixed(0)}s`;
+}
+
+function scoreColor(score) {
+  if (score >= 1) return '#34d399';
+  if (score > 0) return '#fbbf24';
+  return '#f87171';
+}
+
+// ── Sidebar ──
+
+function renderSidebar() {
+  const icon = document.body.classList.contains('light') ? '\u263E' : '\u2600';
+  let html = `<div class="sidebar-header"><h2>Terrarium</h2><button class="theme-toggle" onclick="toggleTheme()">${icon}</button></div>`;
+
+  // Overview entry (only for job-level data)
+  if (jobData) {
+    html += `<div class="sidebar-overview active" onclick="showOverview()">
+      <span class="icon">\u2302</span>
+      <span class="text">Overview</span>
+    </div>`;
+  }
+
+  html += '<div class="trial-list">';
+  trialResults.forEach((tr, i) => {
+    const score = tr.checker_result?.score ?? 0;
+    const hasError = tr.exception_info != null;
+    const color = hasError ? '#f87171' : scoreColor(score);
+    html += `<div class="trial-item" data-idx="${i}" onclick="selectTrial(${i})">
+      <div class="name">${esc(tr.trial_name)}</div>
+      <div class="meta">
+        <span style="color:${color}">${hasError ? 'ERROR' : score.toFixed(2)}</span>
+        <span>${tr.trajectory?.messages?.length || 0} msgs</span>
+      </div>
+      <div class="score-bar"><div class="score-bar-fill" style="width:${score * 100}%;background:${color}"></div></div>
+    </div>`;
+  });
+  html += '</div>';
+  sidebar.innerHTML = html;
+}
+
+function updateSidebarActive() {
+  document.querySelectorAll('.sidebar-overview').forEach(el => {
+    el.classList.toggle('active', currentView === 'overview');
+  });
+  document.querySelectorAll('.trial-item').forEach((el, i) => {
+    el.classList.toggle('active', i === currentView);
+  });
+}
+
+function switchView(renderFn) {
+  main.classList.add('switching');
+  requestAnimationFrame(() => {
+    main.scrollTop = 0;
+    renderFn();
+    requestAnimationFrame(() => main.classList.remove('switching'));
+  });
+}
+
+function showOverview() {
+  currentView = 'overview';
+  updateSidebarActive();
+  switchView(() => renderJobOverview());
+}
+
+function selectTrial(idx) {
+  currentView = idx;
+  updateSidebarActive();
+  switchView(() => renderTrialDetail(trialResults[idx]));
+
+  const activeItem = document.querySelector('.trial-item.active');
+  if (activeItem) activeItem.scrollIntoView({ block: 'nearest' });
+}
+
+// ── Job Overview ──
+
+function renderJobOverview() {
+  const stats = jobData.stats;
+  const timing = jobData.timing;
+  let html = '<div class="overview">';
+  html += `<h1>Job Results</h1>`;
+  html += `<div class="overview-meta">`;
+  html += `<span>ID: <strong>${esc(jobData.id)}</strong></span>`;
+  if (timing?.duration_sec != null) html += `<span>Duration: <strong>${fmtDuration(timing.duration_sec)}</strong></span>`;
+  html += `</div>`;
+
+  html += '<div class="cards">';
+  html += card('Trials', stats.n_trials);
+  html += card('Errors', stats.n_errors, stats.n_errors > 0 ? 'fail' : 'pass');
+  html += '</div>';
+
+  if (Object.keys(stats.agent_dataset_stats).length > 0) {
+    html += '<div class="stats-section">';
+    for (const [key, gs] of Object.entries(stats.agent_dataset_stats)) {
+      html += `<div class="stats-group">`;
+      html += `<h3>${esc(key)}</h3>`;
+      html += `<div class="stats-metrics">`;
+      html += statMetric('Trials', gs.n_trials);
+      html += statMetric('Errors', gs.n_errors);
+      for (const [mname, mval] of Object.entries(gs.metrics || {})) {
+        html += statMetric(mname, typeof mval === 'number' ? mval.toFixed(3) : mval);
+      }
+      html += '</div>';
+      if (gs.score_stats && Object.keys(gs.score_stats).length > 0) {
+        html += '<div style="margin-top:14px;font-size:12px;color:rgb(var(--text-secondary))">';
+        html += '<span style="font-weight:600">Score distribution:</span> ';
+        for (const [score, trials] of Object.entries(gs.score_stats)) {
+          html += `<span style="margin-left:10px;color:${scoreColor(parseFloat(score))}">${score} (${trials.length})</span>`;
+        }
+        html += '</div>';
+      }
+      if (gs.exception_stats && Object.keys(gs.exception_stats).length > 0) {
+        html += '<div style="margin-top:8px;font-size:12px;color:#f87171">';
+        for (const [etype, trials] of Object.entries(gs.exception_stats)) {
+          html += `<div>${esc(etype)}: ${trials.length} trial(s)</div>`;
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+
+  // Trial summary table
+  html += '<div class="section"><h2>All Trials</h2>';
+  html += '<div style="display:flex;flex-direction:column;gap:4px">';
+  trialResults.forEach((tr, i) => {
+    const score = tr.checker_result?.score ?? 0;
+    const hasError = tr.exception_info != null;
+    const color = hasError ? '#f87171' : scoreColor(score);
+    const dur = tr.execution_timing?.duration_sec;
+    html += `<div onclick="selectTrial(${i})" style="
+      display:flex; align-items:center; gap:16px; padding:10px 16px;
+      background:rgb(var(--bg-surface)); border-radius:8px;
+      border:1px solid rgb(var(--border)/0.06); cursor:pointer;
+      transition:border-color 0.2s ease; font-size:13px;
+    " onmouseover="this.style.borderColor='rgb(76 84 236/0.3)'" onmouseout="this.style.borderColor='rgb(255 255 255/0.06)'">
+      <span style="color:${color};font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;width:50px">${hasError ? 'ERR' : score.toFixed(2)}</span>
+      <span style="flex:1;color:rgb(var(--text-primary));overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(tr.trial_name)}</span>
+      <span style="color:rgb(var(--text-secondary));font-family:'JetBrains Mono',monospace;font-size:11px">${dur != null ? fmtDuration(dur) : '-'}</span>
+    </div>`;
+  });
+  html += '</div></div>';
+
+  html += '</div>';
+  main.innerHTML = html;
+}
+
+function card(label, value, cls) {
+  return `<div class="card"><div class="card-label">${esc(label)}</div><div class="card-value ${cls || ''}">${value}</div></div>`;
+}
+
+function statMetric(label, value) {
+  return `<div class="stats-metric"><div class="label">${esc(label)}</div><div class="value">${value}</div></div>`;
+}
+
+// ── Trial Detail ──
+
+function renderTrialDetail(tr) {
+  let html = '';
+
+  // Header
+  html += `<div class="section"><h2>${esc(tr.trial_name)}</h2>`;
+  html += `<div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:rgb(var(--text-secondary));margin-bottom:12px">ID: ${esc(tr.id)}</div>`;
+  html += '</div>';
+
+  // Checks
+  if (tr.checker_result) {
+    html += '<div class="section">';
+    const score = tr.checker_result.score;
+    html += `<h2>Score: <span style="color:${scoreColor(score)}">${score.toFixed(2)}</span></h2>`;
+    html += '<div class="checks">';
+    for (const c of (tr.checker_result.checks || [])) {
+      html += `<span class="check ${c.passed ? 'pass' : 'fail'}">${c.passed ? '\u2713' : '\u2717'} ${esc(c.name)}</span>`;
+    }
+    html += '</div>';
+    for (const c of (tr.checker_result.checks || [])) {
+      if (c.exception) {
+        html += `<div class="exception-box" style="margin-top:6px">`;
+        html += `<div class="exception-type">${esc(c.name)}: ${esc(c.exception.exception_type)}</div>`;
+        html += `<div class="exception-msg">${esc(c.exception.exception_message)}</div>`;
+        html += '</div>';
+      }
+    }
+    html += '</div>';
+  }
+
+  // Info
+  html += '<div class="section"><h2>Info</h2>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">';
+  if (tr.task_info) {
+    html += '<div><h3>Task</h3><div class="info-grid">';
+    html += infoRow('Name', tr.task_info.name);
+    html += infoRow('Path', tr.task_info.path);
+    html += infoRow('Source', tr.task_info.source);
+    html += '</div></div>';
+  }
+  if (tr.agent_info) {
+    html += '<div><h3>Agent</h3><div class="info-grid">';
+    html += infoRow('Name', tr.agent_info.name);
+    if (tr.agent_info.import_path) html += infoRow('Import', tr.agent_info.import_path);
+    if (tr.agent_info.version) html += infoRow('Version', tr.agent_info.version);
+    if (tr.agent_info.model_name) html += infoRow('Model', tr.agent_info.model_name);
+    html += '</div></div>';
+  }
+  html += '</div></div>';
+
+  // Timing
+  html += '<div class="section"><h2>Timing</h2>';
+  html += renderTiming(tr);
+  html += '</div>';
+
+  // Exception
+  if (tr.exception_info) {
+    html += '<div class="section"><h2>Exception</h2>';
+    html += `<div class="exception-box">`;
+    html += `<div class="exception-type">${esc(tr.exception_info.exception_type)}</div>`;
+    html += `<div class="exception-msg">${esc(tr.exception_info.exception_message)}</div>`;
+    if (tr.exception_info.exception_traceback) {
+      html += `<div class="exception-tb"><div class="collapsible block-label collapsed">Traceback</div>`;
+      html += `<div class="collapsible-content collapsed"><pre>${esc(tr.exception_info.exception_traceback)}</pre></div></div>`;
+    }
+    html += '</div></div>';
+  }
+
+  // Trajectory
+  if (tr.trajectory) {
+    html += '<div class="section" id="trajectory-section"><h2>Trajectory</h2>';
+    const m = tr.trajectory.metrics;
+    if (m) {
+      html += '<div class="cards" style="margin-bottom:20px">';
+      for (const [k, v] of Object.entries(m)) {
+        if (v == null) continue;
+        const label = k.replace(/^total_/, '').replace(/_/g, ' ');
+        html += `<div class="card"><div class="card-label">${esc(label)}</div><div class="card-value" style="font-size:18px">${typeof v === 'number' ? v.toLocaleString() : v}</div></div>`;
+      }
+      html += '</div>';
+    }
+
+    // Count stages first
+    const msgs = tr.trajectory.messages || [];
+    let stageCount = 0;
+    for (const msg of msgs) {
+      if (msg.role === 'user' && typeof msg.content === 'string') stageCount++;
+    }
+
+    // Stage nav (only if multiple stages)
+    if (stageCount > 1) {
+      html += '<div class="stage-nav"><span class="stage-nav-label">Stages</span>';
+      for (let i = 1; i <= stageCount; i++) {
+        html += `<button class="stage-nav-item" onclick="scrollToStage(${i})">Stage ${i}</button>`;
+      }
+      html += '</div>';
+    }
+
+    html += renderMessages(msgs);
+    html += '</div>';
+  }
+
+  main.innerHTML = html;
+  wireCollapsibles();
+  wireStageScrollSpy();
+}
+
+function infoRow(label, value) {
+  return `<div class="label">${esc(label)}</div><div class="value">${esc(value)}</div>`;
+}
+
+function renderTiming(tr) {
+  const timings = [
+    { label: 'Total', timing: tr.timing, cls: 'total' },
+    { label: 'Setup', timing: tr.setup_timing, cls: 'setup' },
+    { label: 'Execution', timing: tr.execution_timing, cls: 'exec' },
+  ];
+  const maxDur = Math.max(...timings.map(t => t.timing?.duration_sec || 0), 0.001);
+  let html = '<div class="timing-bars">';
+  for (const t of timings) {
+    const dur = t.timing?.duration_sec;
+    const pct = dur != null ? (dur / maxDur * 100) : 0;
+    html += `<div class="timing-row">
+      <div class="timing-label">${t.label}</div>
+      <div class="timing-bar"><div class="timing-bar-fill ${t.cls}" style="width:${pct}%">${dur != null ? fmtDuration(dur) : '-'}</div></div>
+    </div>`;
+  }
+  html += '</div>';
+  return html;
+}
+
+// ── Messages ──
+
+function getDisplayRole(msg) {
+  if (msg.role === 'user' && Array.isArray(msg.content) &&
+      msg.content.length > 0 && msg.content.every(b => b.type === 'tool_result')) {
+    return 'tool';
+  }
+  return msg.role;
+}
+
+function renderMessages(msgs) {
+  let html = '';
+  let stageIdx = 0;
+  for (const msg of msgs) {
+    if (msg.role === 'user' && typeof msg.content === 'string') {
+      stageIdx++;
+      html += `<div class="stage-label" id="stage-${stageIdx}" data-stage="${stageIdx}">Stage ${stageIdx}</div>`;
+    }
+    const displayRole = getDisplayRole(msg);
+    html += `<div class="message ${displayRole}">`;
+    html += `<div class="role ${displayRole}">${displayRole}</div>`;
+    if (typeof msg.content === 'string') {
+      html += `<div class="block"><div class="text-content">${esc(msg.content)}</div></div>`;
+    } else if (Array.isArray(msg.content)) {
+      for (const block of msg.content) {
+        html += renderBlock(block);
+      }
+    }
+    html += '</div>';
+  }
+  return html;
+}
+
+function renderMd(text) {
+  if (typeof marked !== 'undefined') {
+    try { return marked.parse(text); } catch(e) {}
+  }
+  return `<div class="text-content">${esc(text)}</div>`;
+}
+
+function renderBlock(block) {
+  if (block.type === 'text') {
+    return `<div class="block"><div class="md-content">${renderMd(block.text)}</div></div>`;
+  }
+  if (block.type === 'thinking') {
+    return `<div class="block"><div class="collapsible block-label collapsed">Thinking</div><div class="collapsible-content collapsed"><div class="thinking md-content">${renderMd(block.thinking)}</div></div></div>`;
+  }
+  if (block.type === 'tool_use') {
+    const inputStr = JSON.stringify(block.input, null, 2);
+    return `<div class="block tool-use"><div class="collapsible collapsed"><span class="tool-name">${esc(block.name)}</span></div><div class="collapsible-content collapsed"><div style="margin-top:10px"><pre>${esc(inputStr)}</pre></div></div></div>`;
+  }
+  if (block.type === 'tool_result') {
+    const text = block.content || '(empty)';
+    // Always collapsed by default
+    return `<div class="block tool-result"><div class="collapsible block-label collapsed">Tool Result</div><div class="collapsible-content collapsed"><pre>${esc(text)}</pre></div></div>`;
+  }
+  return `<div class="block"><pre>${esc(JSON.stringify(block, null, 2))}</pre></div>`;
+}
+
+function wireCollapsibles() {
+  document.querySelectorAll('.collapsible').forEach(el => {
+    if (el.dataset.wired) return;
+    el.dataset.wired = '1';
+    el.addEventListener('click', () => {
+      el.classList.toggle('collapsed');
+      el.nextElementSibling.classList.toggle('collapsed');
+    });
+  });
+}
+
+function scrollToStage(idx) {
+  const el = document.getElementById(`stage-${idx}`);
+  if (!el) return;
+  const navHeight = document.querySelector('.stage-nav')?.offsetHeight || 0;
+  const top = el.offsetTop - navHeight - 20;
+  main.scrollTo({ top, behavior: 'smooth' });
+}
+
+function wireStageScrollSpy() {
+  const stageEls = document.querySelectorAll('.stage-label[data-stage]');
+  if (stageEls.length <= 1) return;
+
+  const navItems = document.querySelectorAll('.stage-nav-item');
+  if (!navItems.length) return;
+
+  const observer = new IntersectionObserver(entries => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        const idx = parseInt(entry.target.dataset.stage);
+        navItems.forEach((btn, i) => {
+          btn.classList.toggle('active', i === idx - 1);
+        });
+      }
+    }
+  }, { root: main, rootMargin: '-60px 0px -70% 0px', threshold: 0 });
+
+  stageEls.forEach(el => observer.observe(el));
+}
+</script>
+</body>
+</html>

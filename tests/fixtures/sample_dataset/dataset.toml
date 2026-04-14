@@ -1,0 +1,5 @@
+[metadata]
+name = "sample_dataset"
+
+[metrics]
+types = ["mean", "max"]

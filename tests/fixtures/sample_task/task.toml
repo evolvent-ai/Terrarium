@@ -1,0 +1,7 @@
+[metadata]
+name = "sample_task"
+author = "test"
+difficulty = "easy"
+category = "test"
+tags = ["test"]
+description = "A sample task for testing"

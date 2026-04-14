@@ -1,0 +1,7 @@
+[metadata]
+name = "tool_call_task"
+author = "test"
+difficulty = "easy"
+category = "test"
+tags = ["test", "tools"]
+description = "Exercise an agent's tool-calling path with a trivial add tool"

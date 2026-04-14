@@ -1,0 +1,7 @@
+[metadata]
+name = "proactive_webhook"
+author = "terrarium"
+difficulty = "medium"
+category = "personal_assistant"
+tags = ["proactive", "email", "webhook"]
+description = "Agent monitors Alex's inbox and autonomously handles incoming emails — replying when needed, ignoring when not."

@@ -1,0 +1,26 @@
+[
+    {
+        "from": "li.wei@university.edu",
+        "to": "alex@university.edu",
+        "subject": "Slides from today's talk",
+        "body": "Hi Alex, here are the slides from today's multi-agent RL talk as promised. Could you reply to confirm you received them? Thanks! — Wei",
+        "date": "2025-06-10T10:30:00",
+        "expect_reply": true
+    },
+    {
+        "from": "noreply@arxiv.org",
+        "to": "alex@university.edu",
+        "subject": "Daily arXiv digest: cs.LG",
+        "body": "Today's papers:\n1. Scaling Laws for Reward Models\n2. Offline RL with Implicit Q-Learning\n3. Multi-Agent Cooperation via Communication",
+        "date": "2025-06-10T14:00:00",
+        "expect_reply": false
+    },
+    {
+        "from": "zhang@university.edu",
+        "to": "alex@university.edu",
+        "subject": "Lab key card",
+        "body": "Hi Alex, I found your lab key card on my desk. You can pick it up from my office anytime tomorrow. Just reply so I know you got this message. — Prof. Zhang",
+        "date": "2025-06-10T16:00:00",
+        "expect_reply": true
+    }
+]

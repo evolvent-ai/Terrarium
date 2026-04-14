@@ -1,0 +1,6 @@
+[metadata]
+name = "pass_task"
+author = "test"
+difficulty = "easy"
+category = "test"
+description = "Always passes"
