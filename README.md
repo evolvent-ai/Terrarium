@@ -46,6 +46,8 @@ A Claude Code agent running the **Branch & Loop** task — checking email, writi
 
 https://github.com/user-attachments/assets/6c2bcd92-b7a6-4baa-8e59-475e3c800eb1
 
+[[video link]](https://oss.evolvent.co/articles/terrarium.mp4)
+
 ## Quick Start
 
 ```bash
