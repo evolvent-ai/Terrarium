@@ -54,7 +54,7 @@ class Dataset:
             if not child.is_dir():
                 continue
             try:
-                tasks.extend(Task.load(child))
+                tasks.extend(Task.resolve(child))
             except Exception:
                 tasks.extend(self._discover_tasks(child))
         return tasks

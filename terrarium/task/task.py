@@ -23,7 +23,7 @@ class Task:
         self._load_entry()
 
     @classmethod
-    def load(cls, task_dir: str | Path) -> list[Task]:
+    def resolve(cls, task_dir: str | Path) -> list[Task]:
         """Load a task directory. Returns multiple Tasks if parameterized."""
         base = cls(task_dir)
         gen_fn = getattr(base._entry_fn, "_terrarium_parameterize", None)
