@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import tomllib
 from copy import deepcopy
+from functools import partial
 from pathlib import Path
 from typing import Callable
 
@@ -34,8 +35,7 @@ class Task:
             t = deepcopy(base)
             t._spec.metadata.name = p["name"]
             t._capabilities = p.get("capabilities", base._capabilities)
-            params = p.get("params", {})
-            t._entry_fn = lambda env, agent, _kw=params, _fn=base._entry_fn: _fn(env, agent, **_kw)
+            t._entry_fn = partial(base._entry_fn, **p.get("params", {}))
             tasks.append(t)
         return tasks
 
