@@ -2,7 +2,9 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+from terrarium.task.task import Task
 
 
 class AgentConfig(BaseModel):
@@ -15,10 +17,12 @@ class AgentConfig(BaseModel):
 
 class TaskConfig(BaseModel):
     """Reference to a task."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     path: str
     name: str = ""
     source: str = "adhoc"
-    instance: Any = Field(default=None, exclude=True)
+    instance: Task | None = Field(default=None, exclude=True)
 
 
 class RetryConfig(BaseModel):
