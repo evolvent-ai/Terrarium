@@ -17,6 +17,10 @@ Terrarium is a framework for generating rich, multi-turn agent rollouts across l
 
 Use it to benchmark agents, collect training trajectories, or build evaluation datasets that capture the complexity of real-world workflows.
 
+https://github.com/user-attachments/assets/eeaf0af8-4915-4482-ae2f-917870f09f11
+
+[[video link]](https://oss.evolvent.co/articles/terrarium-1.mp4)
+
 ## Motivation
 
 The way we evaluate and train agents has evolved through three phases:
