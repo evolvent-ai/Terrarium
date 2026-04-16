@@ -1,8 +1,11 @@
 """Configuration models."""
 from __future__ import annotations
 from pathlib import Path
-from typing import Any
-from pydantic import BaseModel, Field
+from typing import TYPE_CHECKING, Any
+from pydantic import BaseModel, Field, PrivateAttr
+
+if TYPE_CHECKING:
+    from terrarium.task.task import Task
 
 
 class AgentConfig(BaseModel):
@@ -18,6 +21,7 @@ class TaskConfig(BaseModel):
     path: str
     name: str = ""
     source: str = "adhoc"
+    _task: Task | None = PrivateAttr(default=None)
 
 
 class RetryConfig(BaseModel):

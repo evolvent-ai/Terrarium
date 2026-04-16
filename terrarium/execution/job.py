@@ -74,8 +74,10 @@ class Job:
                     trial_name = f"{agent_cfg.name}__{model_name}__{source}__{task.name}"
                     if cfg.n_attempts > 1:
                         trial_name += f"__attempt{attempt_idx}"
+                    task_cfg = TaskConfig(path=str(task.dir), name=task.name, source=source)
+                    task_cfg._task = task
                     configs.append(TrialConfig(
-                        task=TaskConfig(path=str(task.dir), name=task.name, source=source),
+                        task=task_cfg,
                         agent=agent_cfg,
                         trial_name=trial_name,
                         trial_dir=job_dir / trial_name,
