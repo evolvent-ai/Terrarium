@@ -1,0 +1,6 @@
+[metadata]
+name = "parameterized_task"
+author = "test"
+difficulty = "easy"
+category = "test"
+description = "A parameterized task for testing"

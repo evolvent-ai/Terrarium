@@ -32,3 +32,25 @@ def test_preserves_name():
 
     assert my_task.__name__ == "my_task"
     assert my_task.__doc__ == "My task docstring."
+
+
+def test_parameterize_default():
+    """Decorated function has _terrarium_parameterize set to None by default."""
+    @entry(capabilities=[])
+    def my_task(env, agent):
+        pass
+
+    assert my_task._terrarium_parameterize is None
+
+
+def test_parameterize_registers_generator():
+    """task.parameterize registers the generator function."""
+    @entry(capabilities=[])
+    def my_task(env, agent, *, x: int):
+        pass
+
+    @my_task.parameterize
+    def gen():
+        yield {"name": "a", "params": {"x": 1}}
+
+    assert my_task._terrarium_parameterize is gen

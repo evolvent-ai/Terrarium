@@ -12,5 +12,12 @@ def entry(capabilities: list[str]) -> Callable:
             return fn(*args, **kwargs)
         wrapper._terrarium_entry = True
         wrapper._terrarium_capabilities = capabilities
+        wrapper._terrarium_parameterize = None
+
+        def parameterize(gen_fn: Callable) -> Callable:
+            wrapper._terrarium_parameterize = gen_fn
+            return gen_fn
+
+        wrapper.parameterize = parameterize
         return wrapper
     return decorator
