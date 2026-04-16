@@ -2,6 +2,8 @@
 from __future__ import annotations
 import importlib.util
 import tomllib
+from copy import deepcopy
+from functools import partial
 from pathlib import Path
 from typing import Callable
 
@@ -19,6 +21,23 @@ class Task:
         self._entry_fn: Callable | None = None
         self._capabilities: list[str] = []
         self._load_entry()
+
+    @classmethod
+    def resolve(cls, task_dir: str | Path) -> list[Task]:
+        """Load a task directory. Returns multiple Tasks if parameterized."""
+        base = cls(task_dir)
+        gen_fn = getattr(base._entry_fn, "_terrarium_parameterize", None)
+        if gen_fn is None:
+            return [base]
+
+        tasks = []
+        for p in gen_fn():
+            t = deepcopy(base)
+            t._spec.metadata.name = p["name"]
+            t._capabilities = p.get("capabilities", base._capabilities)
+            t._entry_fn = partial(base._entry_fn, **p.get("params", {}))
+            tasks.append(t)
+        return tasks
 
     def _load_spec(self) -> TaskSpec:
         toml_file = self._dir / "task.toml"

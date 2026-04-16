@@ -33,7 +33,7 @@ class Trial:
         cfg = self._config
         started_at = datetime.now(timezone.utc)
 
-        self._task = Task(cfg.task.path)
+        self._task = cfg.task.instance or Task(cfg.task.path)
         self._agent = create_agent(cfg.agent)
         trial_id = uuid4()
         if cfg.trial_name:
