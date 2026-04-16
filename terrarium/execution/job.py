@@ -95,8 +95,8 @@ class Job:
                 entries.append((task, dataset.name))
 
         for task_path in self._config.tasks:
-            task = Task(task_path)
-            entries.append((task, "adhoc"))
+            for task in Task.resolve(task_path):
+                entries.append((task, "adhoc"))
 
         return entries
 
