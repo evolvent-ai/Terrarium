@@ -75,7 +75,7 @@ class Job:
                     if cfg.n_attempts > 1:
                         trial_name += f"__attempt{attempt_idx}"
                     configs.append(TrialConfig(
-                        task=TaskConfig(path=str(task.dir), name=task.name, source=source),
+                        task=TaskConfig(path=str(task.dir), name=task.name, source=source, instance=task),
                         agent=agent_cfg,
                         trial_name=trial_name,
                         trial_dir=job_dir / trial_name,
@@ -95,8 +95,8 @@ class Job:
                 entries.append((task, dataset.name))
 
         for task_path in self._config.tasks:
-            task = Task(task_path)
-            entries.append((task, "adhoc"))
+            for task in Task.resolve(task_path):
+                entries.append((task, "adhoc"))
 
         return entries
 
