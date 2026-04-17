@@ -5,6 +5,7 @@ import pytest
 from terrarium.agent.codex import (
     CodexAgent,
     SESSION_DIR,
+    SKILLS_DIR,
     parse_codex_session,
     _parse_json_arguments,
 )
@@ -23,6 +24,7 @@ class _FakeFS:
         self._files: dict[str, bytes] = {}
         self.make_dir_calls: list[str] = []
         self.write_file_calls: list[tuple[str, bytes]] = []
+        self.upload_calls: list[tuple[str, str]] = []
 
     def make_dir(self, path: str) -> None:
         self.make_dir_calls.append(path)
@@ -30,6 +32,9 @@ class _FakeFS:
     def write_file(self, path: str, content: bytes) -> None:
         self.write_file_calls.append((path, content))
         self._files[path] = content
+
+    def upload(self, local_path: str, sandbox_path: str) -> None:
+        self.upload_calls.append((local_path, sandbox_path))
 
     def read_file(self, path: str) -> bytes:
         if path not in self._files:
@@ -139,6 +144,48 @@ class TestSessionFileDiscovery:
         agent._workspace = workspace
         with pytest.raises(RuntimeError, match="found 2"):
             agent._read_new_session_entries()
+
+
+class TestInstallSkill:
+    def test_uploads_directory(self, tmp_path):
+        """Uploads the skill dir to /root/.agents/skills/<name>."""
+        skill_dir = tmp_path / "my_skill"
+        skill_dir.mkdir()
+
+        agent = CodexAgent()
+        agent._workspace = _FakeWorkspace()
+        agent.install_skill(skill_dir)
+
+        fs = agent._workspace.fs
+        assert fs.make_dir_calls == [SKILLS_DIR]
+        assert fs.upload_calls == [(str(skill_dir.resolve()), f"{SKILLS_DIR}/my_skill")]
+
+    def test_accepts_string_path(self, tmp_path):
+        """Accepts str path, not just Path."""
+        skill_dir = tmp_path / "parser"
+        skill_dir.mkdir()
+
+        agent = CodexAgent()
+        agent._workspace = _FakeWorkspace()
+        agent.install_skill(str(skill_dir))
+
+        assert agent._workspace.fs.upload_calls[0][1] == f"{SKILLS_DIR}/parser"
+
+    def test_rejects_missing_path(self, tmp_path):
+        """Raises if path does not exist."""
+        agent = CodexAgent()
+        agent._workspace = _FakeWorkspace()
+        with pytest.raises(FileNotFoundError, match="not a directory"):
+            agent.install_skill(tmp_path / "nonexistent")
+
+    def test_rejects_file(self, tmp_path):
+        """Raises if path is a file, not a directory."""
+        (tmp_path / "SKILL.md").write_text("not a dir")
+
+        agent = CodexAgent()
+        agent._workspace = _FakeWorkspace()
+        with pytest.raises(FileNotFoundError, match="not a directory"):
+            agent.install_skill(tmp_path / "SKILL.md")
 
 
 class TestAct:

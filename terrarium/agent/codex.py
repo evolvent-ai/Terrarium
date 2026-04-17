@@ -11,6 +11,7 @@ import json
 import os
 import re
 import shlex
+from pathlib import Path
 
 from loguru import logger
 
@@ -31,6 +32,7 @@ DEFAULT_IMAGE = "terrarium/codex:latest"
 CODEX_HOME = "/root/.codex"
 SESSION_DIR = f"{CODEX_HOME}/sessions"
 AUTH_PATH = f"{CODEX_HOME}/auth.json"
+SKILLS_DIR = "/root/.agents/skills"
 
 
 class CodexAgent(BaseAgent):
@@ -72,6 +74,16 @@ class CodexAgent(BaseAgent):
         self._version = self._detect_version()
         self._write_auth()
         logger.info("Codex agent ready: version={}", self._version)
+
+    def install_skill(self, path: str | Path) -> None:
+        path = Path(path).resolve()
+        if not path.is_dir():
+            raise FileNotFoundError(f"Skill path is not a directory: {path}")
+        skill_name = path.name
+        dest = f"{SKILLS_DIR}/{skill_name}"
+        self._workspace.fs.make_dir(SKILLS_DIR)
+        self._workspace.fs.upload(str(path), dest)
+        logger.info("Installed skill: {} -> {}", skill_name, dest)
 
     def act(self, instruction: str) -> ActResult:
         command = self._build_command(instruction)
