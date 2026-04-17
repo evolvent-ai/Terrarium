@@ -76,8 +76,6 @@ Only set keys you want to override — every capability has defaults. See the re
 )
 ```
 
-The agent's own workspace image always wins over any `workspace` entry the task declares (the image has the agent CLI pre-installed), but other workspace keys pass through.
-
 ## Driving the Agent
 
 `agent.act(instruction)` sends a natural language instruction to the agent and waits for completion. Call it multiple times for multi-turn interactions.

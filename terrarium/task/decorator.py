@@ -24,10 +24,8 @@ def entry(
         def wrapper(*args, **kwargs):
             return fn(*args, **kwargs)
         wrapper._terrarium_entry = True
-        wrapper._terrarium_capabilities = capabilities
-        wrapper._terrarium_capabilities_config = (
-            deepcopy(capabilities_config) if capabilities_config else {}
-        )
+        wrapper._terrarium_capabilities = deepcopy(capabilities)
+        wrapper._terrarium_capabilities_config = deepcopy(capabilities_config) if capabilities_config else {}
         wrapper._terrarium_parameterize = None
 
         def parameterize(gen_fn: Callable) -> Callable:
