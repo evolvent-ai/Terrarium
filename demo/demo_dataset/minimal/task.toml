@@ -1,0 +1,7 @@
+[metadata]
+name = "minimal"
+author = "terrarium"
+difficulty = "easy"
+category = "workspace"
+tags = ["workspace", "multi-turn"]
+description = "Minimal two-stage task: create a file, then append a line."
