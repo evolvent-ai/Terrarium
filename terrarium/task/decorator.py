@@ -1,7 +1,7 @@
 """@entry decorator for task definition."""
 from __future__ import annotations
-import copy
 import functools
+from copy import deepcopy
 from typing import Callable
 
 
@@ -26,7 +26,7 @@ def entry(
         wrapper._terrarium_entry = True
         wrapper._terrarium_capabilities = capabilities
         wrapper._terrarium_capabilities_config = (
-            copy.deepcopy(capabilities_config) if capabilities_config else {}
+            deepcopy(capabilities_config) if capabilities_config else {}
         )
         wrapper._terrarium_parameterize = None
 

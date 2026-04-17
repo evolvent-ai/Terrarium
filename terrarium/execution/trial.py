@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import shutil
+from copy import deepcopy
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -115,9 +116,7 @@ class Trial:
 
     def _create_env(self) -> ComposableEnvironment:
         capabilities = list(self._task.capabilities)
-        caps_config: dict[str, dict] = {
-            k: dict(v) for k, v in self._task.capabilities_config.items()
-        }
+        caps_config: dict[str, dict] = deepcopy(self._task.capabilities_config)
         ws_config = self._agent.workspace_config()
         if ws_config is not None:
             if "workspace" not in capabilities:
