@@ -65,17 +65,20 @@ uv sync
 ```bash
 # .env
 ANTHROPIC_API_KEY=sk-...
+OPENAI_API_KEY=sk-...
+OPENAI_BASE_URL=https://...
 NOTION_TOKEN=ntn_...                          # if using notion capability
 GOOGLE_SHEETS_CREDENTIALS_FILE=creds.json     # if using google_sheets capability
 ```
 
 ### Build Docker Images (optional)
 
-Sandbox-based agents (claude_code, openclaw) run inside containers. Build the images you need:
+Sandbox-based agents (claude_code, openclaw, codex) run inside containers. Build the images you need:
 
 ```bash
 docker build -t terrarium/claude-code -f docker/claude-code.Dockerfile docker/
 docker build -t terrarium/openclaw -f docker/openclaw.Dockerfile docker/
+docker build -t terrarium/codex -f docker/codex.Dockerfile docker/
 ```
 
 ### Try It
@@ -86,13 +89,14 @@ terrarium run -c demo/run_config.toml
 
 ## Built-in Agents
 
-Three agents are provided out of the box:
+Four agents are provided out of the box:
 
 
 | Agent         | Runs in    | Description                                                                         |
 | ------------- | ---------- | ----------------------------------------------------------------------------------- |
 | `claude_code` | Docker     | Claude Code CLI, stream-json output, multi-turn via session ID                      |
 | `openclaw`    | Docker     | OpenClaw CLI, session JSONL output                                                  |
+| `codex`       | Docker     | OpenAI Codex CLI, session JSONL output, multi-turn via session ID                   |
 | `mini`        | In-process | Lightweight agent via litellm, supports tool registration and custom system prompts |
 
 
@@ -185,6 +189,30 @@ types = ["mean", "max", "pass@5"]
 ```
 
 Built-in metrics: `mean`, `max`, `min`, `sum`, `pass@k`.
+
+### Parameterized Tasks
+
+When many tasks share the same logic and differ only in data (tau2-bench, Harbor-style benchmarks, etc.), one `task.py` can expand into N independent task instances via `@task.parameterize`:
+
+```python
+@entry(capabilities=["workspace"])
+def task(env, agent, *, task_index: int):
+    task_data = _load_tasks()[task_index]
+    # ... shared logic using task_data ...
+
+@task.parameterize
+def params():
+    for i in range(len(_load_tasks())):
+        yield {"name": f"retail_task_{i}", "params": {"task_index": i}}
+```
+
+Each yielded item becomes a full `Task` instance with its own name, metrics, and trial results. Optionally override `capabilities` per instance:
+
+```python
+yield {"name": "with_db", "params": {...}, "capabilities": ["workspace", "postgres"]}
+```
+
+The directory layout stays minimal — **one directory, one `task.py`** — instead of N near-identical directories.
 
 ## Running Jobs
 

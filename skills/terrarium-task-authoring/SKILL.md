@@ -243,10 +243,39 @@ name = "my_benchmark"
 types = ["mean", "max", "pass@5"]
 ```
 
+## Parameterized Tasks
+
+When a benchmark has many tasks that share the same logic and differ only in data (tau2-bench, Harbor-style suites, etc.), one `task.py` can expand into N independent task instances. Attach a generator to the entry function via `@<entry_fn>.parameterize`:
+
+```python
+@entry(capabilities=["workspace"])
+def task(env, agent, *, task_index: int):
+    task_data = _load_tasks()[task_index]
+    # ... shared logic using task_data ...
+    return run_checkers({...})
+
+@task.parameterize
+def params():
+    tasks = _load_tasks()
+    for i in range(len(tasks)):
+        yield {"name": f"retail_task_{i}", "params": {"task_index": i}}
+```
+
+Each yielded dict becomes a full `Task`:
+
+| key | required | purpose |
+|---|---|---|
+| `name` | yes | Task instance name (shows up in trial names and metrics) |
+| `params` | yes | kwargs injected into the entry function |
+| `capabilities` | no | Override `@entry(capabilities=...)` for this instance |
+
+Each yielded item becomes an independent task (its own trial, its own metrics). Disk layout stays minimal — **one directory, one `task.py`** — instead of N near-identical directories.
+
 ## Demo Tasks
 
-The `demo/demo_dataset/` directory contains three example tasks that demonstrate key patterns:
+The `demo/demo_dataset/` directory contains example tasks that demonstrate key patterns:
 
+- **minimal** — two-stage file task, smallest possible multi-turn demo
 - **branch_and_loop** — multi-capability (email, notion, calendar), loop to expand content, conditional branching based on environment state
 - **proactive_webhook** — webhook-driven email monitoring, agent decides whether to reply
 - **proactive_heartbeat** — periodic heartbeat signals, agent tracks state across turns, environment self-change between heartbeats
