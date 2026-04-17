@@ -115,11 +115,16 @@ class Trial:
 
     def _create_env(self) -> ComposableEnvironment:
         capabilities = list(self._task.capabilities)
+        config: dict[str, dict] = {k: dict(v) for k, v in self._task.config.items()}
         ws_config = self._agent.workspace_config()
-        if ws_config is not None and "workspace" not in capabilities:
-            capabilities.append("workspace")
-        cap_config = {"workspace": ws_config} if ws_config else {}
-        return ComposableEnvironment(capabilities=capabilities, config=cap_config)
+        if ws_config is not None:
+            if "workspace" not in capabilities:
+                capabilities.append("workspace")
+            # Agent's workspace config wins — it pins the image that has the
+            # agent CLI pre-installed. Task-declared workspace options fill in
+            # the rest (e.g. custom command).
+            config["workspace"] = {**config.get("workspace", {}), **ws_config}
+        return ComposableEnvironment(capabilities=capabilities, config=config)
 
     def _collect_conn_info(self, env: ComposableEnvironment) -> dict:
         conn_info: dict = {}

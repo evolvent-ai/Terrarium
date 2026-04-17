@@ -99,6 +99,94 @@ async def test_persistence(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_task_config_passed_to_env(tmp_path):
+    """Task.config is forwarded to ComposableEnvironment on construction."""
+    task_dir = tmp_path / "t"
+    task_dir.mkdir()
+    (task_dir / "task.py").write_text(
+        "from terrarium.task.decorator import entry\n"
+        "from terrarium.task.checking import run_checkers\n"
+        "\n"
+        "@entry(capabilities=['postgres'],\n"
+        "       config={'postgres': {'db_name': 'shop', 'port': 5433}})\n"
+        "def task(env, agent):\n"
+        "    return run_checkers({'ok': lambda: True})\n"
+    )
+    (task_dir / "task.toml").write_text('[metadata]\nname = "t"\n')
+
+    mock_rt = _make_mock_rt()
+    with patch("terrarium.execution.trial.ComposableEnvironment", return_value=mock_rt) as env_ctor:
+        await Trial(TrialConfig(
+            task=TaskConfig(path=str(task_dir)),
+            agent=AgentConfig(name="mock", import_path=MOCK_AGENT_IMPORT),
+        )).run()
+
+    _, kwargs = env_ctor.call_args
+    assert "postgres" in kwargs["capabilities"]
+    assert kwargs["config"]["postgres"] == {"db_name": "shop", "port": 5433}
+
+
+@pytest.mark.asyncio
+async def test_agent_workspace_config_merged(tmp_path):
+    """Agent workspace_config() is merged into task config; agent wins on image."""
+    task_dir = tmp_path / "t"
+    task_dir.mkdir()
+    (task_dir / "task.py").write_text(
+        "from terrarium.task.decorator import entry\n"
+        "from terrarium.task.checking import run_checkers\n"
+        "\n"
+        "@entry(capabilities=['workspace'],\n"
+        "       config={'workspace': {'image': 'task-img', 'command': 'sleep 1'}})\n"
+        "def task(env, agent):\n"
+        "    return run_checkers({'ok': lambda: True})\n"
+    )
+    (task_dir / "task.toml").write_text('[metadata]\nname = "t"\n')
+
+    class WSAgent:
+        @staticmethod
+        def name() -> str:
+            return "ws"
+
+        def version(self) -> str | None:
+            return "0"
+
+        @classmethod
+        def workspace_config(cls) -> dict:
+            return {"image": "agent-img"}
+
+        def setup(self, workspace, conn_info) -> None:  # noqa: D401
+            pass
+
+        def act(self, instruction):
+            from terrarium.models.result import ActResult
+            return ActResult(messages=[])
+
+        def get_trajectory(self):
+            from terrarium.models.trajectory import Trajectory
+            return Trajectory(messages=[])
+
+        def teardown(self) -> None:
+            pass
+
+    import sys
+    module = type(sys)("_ws_mod")
+    module.WSAgent = WSAgent
+    sys.modules["_ws_mod"] = module
+
+    mock_rt = _make_mock_rt()
+    with patch("terrarium.execution.trial.ComposableEnvironment", return_value=mock_rt) as env_ctor:
+        await Trial(TrialConfig(
+            task=TaskConfig(path=str(task_dir)),
+            agent=AgentConfig(name="ws", import_path="_ws_mod:WSAgent"),
+        )).run()
+
+    _, kwargs = env_ctor.call_args
+    assert kwargs["capabilities"] == ["workspace"]
+    # Agent overrides image; task's 'command' survives.
+    assert kwargs["config"]["workspace"] == {"image": "agent-img", "command": "sleep 1"}
+
+
+@pytest.mark.asyncio
 async def test_timing_info_recorded():
     """setup_timing and execution_timing are populated."""
     mock_rt = _make_mock_rt()
