@@ -5,11 +5,13 @@ from terrarium.agent.base import BaseAgent
 from terrarium.models.config import AgentConfig
 
 from terrarium.agent.claude_code import ClaudeCodeAgent
+from terrarium.agent.codex import CodexAgent
 from terrarium.agent.mini import MiniAgent
 from terrarium.agent.openclaw import OpenClawAgent
 
 _AGENTS: dict[str, type[BaseAgent]] = {
     "claude_code": ClaudeCodeAgent,
+    "codex": CodexAgent,
     "openclaw": OpenClawAgent,
     "mini": MiniAgent,
 }

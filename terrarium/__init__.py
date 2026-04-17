@@ -14,6 +14,7 @@ from terrarium.models import (
 from terrarium.agent.base import BaseAgent
 from terrarium.agent.registry import create_agent
 from terrarium.agent.claude_code import ClaudeCodeAgent
+from terrarium.agent.codex import CodexAgent
 from terrarium.agent.mini import MiniAgent
 from terrarium.agent.openclaw import OpenClawAgent
 # Task
@@ -37,7 +38,7 @@ __all__ = [
     "Message", "RetryConfig", "TaskConfig", "TaskInfo", "TaskSpec", "TextBlock", "ThinkingBlock",
     "TimingInfo", "ToolResultBlock", "ToolUseBlock",
     "Trajectory", "TrajectoryMetrics", "TrialConfig", "TrialResult",
-    "BaseAgent", "create_agent", "ClaudeCodeAgent", "MiniAgent", "OpenClawAgent",
+    "BaseAgent", "create_agent", "ClaudeCodeAgent", "CodexAgent", "MiniAgent", "OpenClawAgent",
     "entry", "run_checkers", "aggregate_results", "Task",
     "Dataset",
     "Trial", "Job",
