@@ -6,7 +6,7 @@ from typing import Callable
 
 
 def entry(
-    capabilities: list[str],
+    capabilities: list[str] | None = None,
     capabilities_config: dict[str, dict] | None = None,
 ) -> Callable:
     """Mark a function as the task entry point.
@@ -14,6 +14,7 @@ def entry(
     Args:
         capabilities: Capability specs the environment should provision
             (e.g. ``["postgres", "email"]`` or ``["postgres:primary"]``).
+            Defaults to no capabilities.
         capabilities_config: Optional per-capability configuration forwarded
             to ``ComposableEnvironment``. Keys follow the same
             ``"type[:instance]"`` shape as ``capabilities``. Example:
@@ -24,7 +25,7 @@ def entry(
         def wrapper(*args, **kwargs):
             return fn(*args, **kwargs)
         wrapper._terrarium_entry = True
-        wrapper._terrarium_capabilities = deepcopy(capabilities)
+        wrapper._terrarium_capabilities = deepcopy(capabilities) if capabilities else []
         wrapper._terrarium_capabilities_config = deepcopy(capabilities_config) if capabilities_config else {}
         wrapper._terrarium_parameterize = None
 
