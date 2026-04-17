@@ -121,25 +121,16 @@ class TestBuildCommand:
         assert "sk-test" in cmd
 
 
-class TestFindSessionFile:
-    def test_single_file(self):
-        """Returns the one rollout-*.jsonl found under SESSION_DIR."""
-        workspace = _FakeWorkspace(shell_responses=[
-            _FakeExecResult(stdout=f"{SESSION_DIR}/2026/04/17/rollout-x-abc.jsonl\n"),
-        ])
-        agent = CodexAgent()
-        agent._workspace = workspace
-        assert agent._find_session_file().endswith("rollout-x-abc.jsonl")
-
-    def test_no_files(self):
-        """Raises if no session file is found."""
+class TestSessionFileDiscovery:
+    def test_no_files_raises(self):
+        """Raises if no session file is found on first read."""
         workspace = _FakeWorkspace(shell_responses=[_FakeExecResult(stdout="")])
         agent = CodexAgent()
         agent._workspace = workspace
         with pytest.raises(RuntimeError, match="found 0"):
-            agent._find_session_file()
+            agent._read_new_session_entries()
 
-    def test_multiple_files(self):
+    def test_multiple_files_raises(self):
         """Raises if multiple session files are found."""
         workspace = _FakeWorkspace(shell_responses=[
             _FakeExecResult(stdout="/a/rollout-1.jsonl\n/a/rollout-2.jsonl\n"),
@@ -147,7 +138,7 @@ class TestFindSessionFile:
         agent = CodexAgent()
         agent._workspace = workspace
         with pytest.raises(RuntimeError, match="found 2"):
-            agent._find_session_file()
+            agent._read_new_session_entries()
 
 
 class TestAct:

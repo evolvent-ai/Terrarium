@@ -81,9 +81,6 @@ class CodexAgent(BaseAgent):
         if result.exit_code != 0:
             logger.warning("Codex exit {}: {}", result.exit_code, result.stderr or "")
 
-        if self._session_file is None:
-            self._session_file = self._find_session_file()
-
         messages, usage, session_id = self._read_new_session_entries()
         if self._session_id is None:
             assert session_id is not None
@@ -133,19 +130,18 @@ class CodexAgent(BaseAgent):
         match = re.search(r"(\d+\.\d+\.\d+)", result.stdout)
         return match.group(1) if match else result.stdout.strip()
 
-    def _find_session_file(self) -> str:
-        result = self._workspace.shell.exec(f"find {SESSION_DIR} -name 'rollout-*.jsonl' -type f")
-        paths = [p for p in (result.stdout or "").strip().split("\n") if p]
-        if len(paths) != 1:
-            raise RuntimeError(f"Expected exactly 1 Codex session file, found {len(paths)}: {paths}")
-        return paths[0]
-
     def _write_auth(self) -> None:
         auth = json.dumps({"OPENAI_API_KEY": self._api_key}).encode()
         self._workspace.fs.make_dir(CODEX_HOME)
         self._workspace.fs.write_file(AUTH_PATH, auth)
 
     def _read_new_session_entries(self) -> tuple[list[Message], dict[str, int], str | None]:
+        if self._session_file is None:
+            result = self._workspace.shell.exec(f"find {SESSION_DIR} -name 'rollout-*.jsonl' -type f")
+            paths = [p for p in (result.stdout or "").strip().split("\n") if p]
+            if len(paths) != 1:
+                raise RuntimeError(f"Expected exactly 1 Codex session file, found {len(paths)}: {paths}")
+            self._session_file = paths[0]
         raw = self._workspace.fs.read_file(self._session_file)
         lines = raw.decode().strip().split("\n")
         new_lines = lines[self._session_entry_count:]
