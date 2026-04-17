@@ -48,6 +48,34 @@ def my_task(env, agent):
 - The function receives `env` (ComposableEnvironment) and `agent` (BaseAgent).
 - It must return a `CheckerResults`. You can use the helper functions `run_checkers()` and `aggregate_results()`, or construct a `CheckerResults` directly.
 
+### Configuring capabilities
+
+Pass per-capability options via the optional `capabilities_config` keyword. Keys match the entries in `capabilities` (`"<type>"` or `"<type>:<instance>"`), values are forwarded to the capability constructor.
+
+```python
+@entry(
+    capabilities=["postgres", "email"],
+    capabilities_config={
+        "postgres": {"db_name": "shop", "port": 5433},
+        "email": {"smtp_port": 3125},
+    },
+)
+def my_task(env, agent):
+    ...
+```
+
+Only set keys you want to override — every capability has defaults. See the reference files under `references/` for supported config keys. For multi-instance capabilities, key by the full spec:
+
+```python
+@entry(
+    capabilities=["postgres:primary", "postgres:analytics"],
+    capabilities_config={
+        "postgres:primary": {"db_name": "main"},
+        "postgres:analytics": {"db_name": "warehouse"},
+    },
+)
+```
+
 ## Driving the Agent
 
 `agent.act(instruction)` sends a natural language instruction to the agent and waits for completion. Call it multiple times for multi-turn interactions.
@@ -268,6 +296,7 @@ Each yielded dict becomes a full `Task`:
 | `name` | yes | Task instance name (shows up in trial names and metrics) |
 | `params` | yes | kwargs injected into the entry function |
 | `capabilities` | no | Override `@entry(capabilities=...)` for this instance |
+| `capabilities_config` | no | Override `@entry(capabilities_config=...)` for this instance |
 
 Each yielded item becomes an independent task (its own trial, its own metrics). Disk layout stays minimal — **one directory, one `task.py`** — instead of N near-identical directories.
 

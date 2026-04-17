@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import shutil
+from copy import deepcopy
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -115,11 +116,16 @@ class Trial:
 
     def _create_env(self) -> ComposableEnvironment:
         capabilities = list(self._task.capabilities)
+        caps_config: dict[str, dict] = deepcopy(self._task.capabilities_config)
         ws_config = self._agent.workspace_config()
-        if ws_config is not None and "workspace" not in capabilities:
-            capabilities.append("workspace")
-        cap_config = {"workspace": ws_config} if ws_config else {}
-        return ComposableEnvironment(capabilities=capabilities, config=cap_config)
+        if ws_config is not None:
+            if "workspace" not in capabilities:
+                capabilities.append("workspace")
+            # Agent's workspace config wins — it pins the image that has the
+            # agent CLI pre-installed. Task-declared workspace options fill in
+            # the rest (e.g. custom command).
+            caps_config["workspace"] = {**caps_config.get("workspace", {}), **ws_config}
+        return ComposableEnvironment(capabilities=capabilities, config=caps_config)
 
     def _collect_conn_info(self, env: ComposableEnvironment) -> dict:
         conn_info: dict = {}
