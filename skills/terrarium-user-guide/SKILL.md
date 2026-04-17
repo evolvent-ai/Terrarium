@@ -13,11 +13,12 @@ Terrarium is a Python framework for building living environments and running LLM
 uv sync                  # install dependencies
 ```
 
-For sandbox-based agents (claude_code, openclaw), build the Docker image:
+For sandbox-based agents (claude_code, openclaw, codex), build the Docker image:
 
 ```bash
 docker build -t terrarium/claude-code -f docker/claude-code.Dockerfile docker/
 docker build -t terrarium/openclaw -f docker/openclaw.Dockerfile docker/
+docker build -t terrarium/codex -f docker/codex.Dockerfile docker/
 ```
 
 Set environment variables in `.env` at the project root:
@@ -25,6 +26,8 @@ Set environment variables in `.env` at the project root:
 ```
 ANTHROPIC_API_KEY=sk-...
 ANTHROPIC_BASE_URL=https://api.anthropic.com  # optional
+OPENAI_API_KEY=sk-...
+OPENAI_BASE_URL=https://api.openai.com        # optional
 ```
 
 ## Two Ways to Run
@@ -138,6 +141,7 @@ The job engine expands `agents x (datasets + tasks) x n_attempts` into individua
 |------|---------|-------------|
 | `claude_code` | Docker | Claude Code CLI with stream-json output |
 | `openclaw` | Docker | OpenClaw CLI with session JSONL output |
+| `codex` | Docker | OpenAI Codex CLI with session JSONL output |
 | `mini` | In-process | Lightweight agent using litellm, for testing |
 
 ### Agent configuration
@@ -168,6 +172,18 @@ kwargs = { models_config_path = "./models.json" }
 | kwarg | type | default | description |
 |-------|------|---------|-------------|
 | `models_config_path` | str | `""` (required) | Path to models provider config JSON |
+
+**codex** — runs OpenAI Codex CLI in Docker (`terrarium/codex`). Requires `OPENAI_API_KEY` in `.env`.
+
+```toml
+[[agents]]
+name = "codex"
+model_name = "gpt-5.4"                       # or "openai/gpt-5" via OpenRouter
+```
+
+| kwarg | type | default | description |
+|-------|------|---------|-------------|
+| `api_key` | str | from `OPENAI_API_KEY` env | API key override |
 
 **mini** — in-process agent using litellm. No Docker needed. Supports tool registration and custom system prompts from task code.
 
