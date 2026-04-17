@@ -28,6 +28,11 @@ skip_no_anthropic_key = pytest.mark.skipif(
     reason="ANTHROPIC_API_KEY not set",
 )
 
+skip_no_openai_key = pytest.mark.skipif(
+    not os.environ.get("OPENAI_API_KEY"),
+    reason="OPENAI_API_KEY not set",
+)
+
 skip_no_openrouter_key = pytest.mark.skipif(
     not os.environ.get("OPENROUTER_API_KEY"),
     reason="OPENROUTER_API_KEY not set",
