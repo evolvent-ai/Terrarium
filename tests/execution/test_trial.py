@@ -15,9 +15,9 @@ SAMPLE_TASK_DIR = FIXTURES_DIR / "sample_task"
 MOCK_AGENT_IMPORT = "tests.agent.mock:MockAgent"
 
 
-def _make_config(**kwargs) -> TrialConfig:
+def _make_config(task_dir: Path = SAMPLE_TASK_DIR, **kwargs) -> TrialConfig:
     return TrialConfig(
-        task=TaskConfig(path=str(SAMPLE_TASK_DIR)),
+        task=TaskConfig(path=str(task_dir)),
         agent=AgentConfig(name="mock", import_path=MOCK_AGENT_IMPORT),
         **kwargs,
     )
@@ -96,6 +96,61 @@ async def test_persistence(tmp_path):
     result_data = json.loads((trial_dir / "result.json").read_text())
     assert "task" in config_data
     assert "trial_name" in result_data
+
+
+def _write_task(task_dir: Path, entry_args: str) -> Path:
+    """Write a minimal task.py + task.toml under task_dir and return task_dir."""
+    task_dir.mkdir()
+    (task_dir / "task.py").write_text(
+        "from terrarium.task.decorator import entry\n"
+        "from terrarium.task.checking import run_checkers\n"
+        "\n"
+        f"@entry({entry_args})\n"
+        "def task(env, agent):\n"
+        "    return run_checkers({'ok': lambda: True})\n"
+    )
+    (task_dir / "task.toml").write_text('[metadata]\nname = "t"\n')
+    return task_dir
+
+
+@pytest.mark.asyncio
+async def test_task_capabilities_config_passed_to_env(tmp_path):
+    """Task.capabilities_config is forwarded to ComposableEnvironment.config."""
+    task_dir = _write_task(
+        tmp_path / "t",
+        "capabilities=['postgres'], "
+        "capabilities_config={'postgres': {'db_name': 'shop', 'port': 5433}}",
+    )
+
+    mock_rt = _make_mock_rt()
+    with patch("terrarium.execution.trial.ComposableEnvironment", return_value=mock_rt) as env_ctor:
+        await Trial(_make_config(task_dir=task_dir)).run()
+
+    _, kwargs = env_ctor.call_args
+    assert "postgres" in kwargs["capabilities"]
+    assert kwargs["config"]["postgres"] == {"db_name": "shop", "port": 5433}
+
+
+@pytest.mark.asyncio
+async def test_agent_workspace_config_merged(tmp_path):
+    """Agent workspace_config() is merged into task capabilities_config; agent wins on image."""
+    task_dir = _write_task(
+        tmp_path / "t",
+        "capabilities=['workspace'], "
+        "capabilities_config={'workspace': {'image': 'task-img', 'command': 'sleep 1'}}",
+    )
+
+    from tests.agent.mock import MockAgent
+
+    mock_rt = _make_mock_rt()
+    with patch.object(MockAgent, "workspace_config", classmethod(lambda cls: {"image": "agent-img"})), \
+         patch("terrarium.execution.trial.ComposableEnvironment", return_value=mock_rt) as env_ctor:
+        await Trial(_make_config(task_dir=task_dir)).run()
+
+    _, kwargs = env_ctor.call_args
+    assert kwargs["capabilities"] == ["workspace"]
+    # Agent overrides image; task's 'command' survives.
+    assert kwargs["config"]["workspace"] == {"image": "agent-img", "command": "sleep 1"}
 
 
 @pytest.mark.asyncio

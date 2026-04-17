@@ -13,7 +13,23 @@ def test_load():
     task = Task(SAMPLE_TASK_DIR)
     assert task.name == "sample_task"
     assert task.capabilities == []
+    assert task.capabilities_config == {}
     assert callable(task.entry_fn)
+
+
+def test_capabilities_config_from_entry(tmp_path):
+    """Task.capabilities_config reflects the value passed to @entry."""
+    (tmp_path / "task.py").write_text(
+        "from terrarium.task.decorator import entry\n"
+        "from terrarium.task.checking import run_checkers\n"
+        "\n"
+        "@entry(capabilities=['postgres'],\n"
+        "       capabilities_config={'postgres': {'db_name': 'x'}})\n"
+        "def task(env, agent):\n"
+        "    return run_checkers({'ok': lambda: True})\n"
+    )
+    task = Task(tmp_path)
+    assert task.capabilities_config == {"postgres": {"db_name": "x"}}
 
 
 def test_metadata():

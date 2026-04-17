@@ -8,6 +8,7 @@ from terrarium.dataset.dataset import Dataset
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 PARAM_TASK_DIR = FIXTURES_DIR / "parameterized_task"
 PARAM_CAPS_TASK_DIR = FIXTURES_DIR / "parameterized_caps_task"
+PARAM_CONFIG_TASK_DIR = FIXTURES_DIR / "parameterized_config_task"
 
 
 def test_load_non_parameterized():
@@ -45,6 +46,22 @@ def test_load_parameterized_capabilities_override():
 
     assert basic.capabilities == ["workspace"]
     assert with_db.capabilities == ["workspace", "postgres"]
+
+
+def test_load_parameterized_capabilities_config_default():
+    """Without a per-instance override, capabilities_config comes from @entry."""
+    tasks = Task.resolve(PARAM_CONFIG_TASK_DIR)
+    inherits = next(t for t in tasks if t.name == "inherits")
+    assert inherits.capabilities_config == {"postgres": {"db_name": "default_db"}}
+
+
+def test_load_parameterized_capabilities_config_override():
+    """A 'capabilities_config' key on a parameterize yield overrides @entry's."""
+    tasks = Task.resolve(PARAM_CONFIG_TASK_DIR)
+    overrides = next(t for t in tasks if t.name == "overrides")
+    assert overrides.capabilities_config == {
+        "postgres": {"db_name": "shop", "port": 6000},
+    }
 
 
 def test_load_parameterized_entry_fn():
