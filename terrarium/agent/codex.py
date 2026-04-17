@@ -12,7 +12,6 @@ import os
 import re
 import shlex
 
-import tomlkit
 from loguru import logger
 
 from terrarium.agent.base import BaseAgent
@@ -31,7 +30,7 @@ from terrarium.models.trajectory import (
 DEFAULT_IMAGE = "terrarium/codex:latest"
 CODEX_HOME = "/root/.codex"
 SESSION_DIR = f"{CODEX_HOME}/sessions"
-CONFIG_PATH = f"{CODEX_HOME}/config.toml"
+AUTH_PATH = f"{CODEX_HOME}/auth.json"
 
 
 class CodexAgent(BaseAgent):
@@ -45,11 +44,9 @@ class CodexAgent(BaseAgent):
         self,
         model: str = "gpt-5.4",
         api_key: str | None = None,
-        base_url: str | None = None,
     ):
         self._model = model
         self._api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
-        self._base_url = base_url or os.environ.get("OPENAI_BASE_URL")
 
         self._workspace = None
         self._session_id: str | None = None
@@ -73,8 +70,7 @@ class CodexAgent(BaseAgent):
     def setup(self, workspace, conn_info: dict) -> None:
         self._workspace = workspace
         self._version = self._detect_version()
-        if self._base_url:
-            self._write_config()
+        self._write_auth()
         logger.info("Codex agent ready: version={}", self._version)
 
     def act(self, instruction: str) -> ActResult:
@@ -144,19 +140,10 @@ class CodexAgent(BaseAgent):
             raise RuntimeError(f"Expected exactly 1 Codex session file, found {len(paths)}: {paths}")
         return paths[0]
 
-    def _write_config(self) -> None:
-        config = {
-            "model_provider": "custom",
-            "model_providers": {
-                "custom": {
-                    "name": "custom",
-                    "base_url": self._base_url,
-                    "env_key": "OPENAI_API_KEY",
-                },
-            },
-        }
+    def _write_auth(self) -> None:
+        auth = json.dumps({"OPENAI_API_KEY": self._api_key}).encode()
         self._workspace.fs.make_dir(CODEX_HOME)
-        self._workspace.fs.write_file(CONFIG_PATH, tomlkit.dumps(config).encode())
+        self._workspace.fs.write_file(AUTH_PATH, auth)
 
     def _read_new_session_entries(self) -> tuple[list[Message], dict[str, int], str | None]:
         raw = self._workspace.fs.read_file(self._session_file)
@@ -169,11 +156,12 @@ class CodexAgent(BaseAgent):
         return f"{self._build_env_vars()}codex {self._build_subcommand()} {self._build_flags()}{shlex.quote(instruction)}"
 
     def _build_env_vars(self) -> str:
-        # base_url is plumbed through config.toml (see _write_config); Codex
-        # reads the custom provider from there. Only the API key is passed via env.
         parts = [
             f"OPENAI_API_KEY={shlex.quote(self._api_key)}",
         ]
+        base_url = os.environ.get("OPENAI_BASE_URL")
+        if base_url:
+            parts.append(f"OPENAI_BASE_URL={shlex.quote(base_url)}")
         return " ".join(parts) + " "
 
     def _build_subcommand(self) -> str:
