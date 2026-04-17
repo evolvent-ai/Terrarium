@@ -4,7 +4,7 @@ from terrarium.task.checking import run_checkers
 
 @entry(
     capabilities=["postgres"],
-    config={"postgres": {"db_name": "default_db"}},
+    capabilities_config={"postgres": {"db_name": "default_db"}},
 )
 def task(env, agent, *, variant: str):
     return run_checkers({"ok": lambda: True})
@@ -16,5 +16,5 @@ def params():
     yield {
         "name": "overrides",
         "params": {"variant": "b"},
-        "config": {"postgres": {"db_name": "shop", "port": 6000}},
+        "capabilities_config": {"postgres": {"db_name": "shop", "port": 6000}},
     }

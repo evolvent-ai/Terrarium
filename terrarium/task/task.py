@@ -20,7 +20,7 @@ class Task:
         self._spec = self._load_spec()
         self._entry_fn: Callable | None = None
         self._capabilities: list[str] = []
-        self._config: dict[str, dict] = {}
+        self._capabilities_config: dict[str, dict] = {}
         self._load_entry()
 
     @classmethod
@@ -36,7 +36,9 @@ class Task:
             t = deepcopy(base)
             t._spec.metadata.name = p["name"]
             t._capabilities = p.get("capabilities", base._capabilities)
-            t._config = p.get("config", base._config)
+            t._capabilities_config = p.get(
+                "capabilities_config", base._capabilities_config
+            )
             t._entry_fn = partial(base._entry_fn, **p.get("params", {}))
             tasks.append(t)
         return tasks
@@ -61,7 +63,9 @@ class Task:
             if callable(attr) and getattr(attr, "_terrarium_entry", False):
                 self._entry_fn = attr
                 self._capabilities = getattr(attr, "_terrarium_capabilities", [])
-                self._config = getattr(attr, "_terrarium_config", {})
+                self._capabilities_config = getattr(
+                    attr, "_terrarium_capabilities_config", {}
+                )
                 break
 
         if self._entry_fn is None:
@@ -80,8 +84,8 @@ class Task:
         return self._capabilities
 
     @property
-    def config(self) -> dict[str, dict]:
-        return self._config
+    def capabilities_config(self) -> dict[str, dict]:
+        return self._capabilities_config
 
     @property
     def metadata(self) -> TaskMetadata:

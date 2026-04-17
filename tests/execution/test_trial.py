@@ -99,8 +99,8 @@ async def test_persistence(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_task_config_passed_to_env(tmp_path):
-    """Task.config is forwarded to ComposableEnvironment on construction."""
+async def test_task_capabilities_config_passed_to_env(tmp_path):
+    """Task.capabilities_config is forwarded to ComposableEnvironment.config."""
     task_dir = tmp_path / "t"
     task_dir.mkdir()
     (task_dir / "task.py").write_text(
@@ -108,7 +108,7 @@ async def test_task_config_passed_to_env(tmp_path):
         "from terrarium.task.checking import run_checkers\n"
         "\n"
         "@entry(capabilities=['postgres'],\n"
-        "       config={'postgres': {'db_name': 'shop', 'port': 5433}})\n"
+        "       capabilities_config={'postgres': {'db_name': 'shop', 'port': 5433}})\n"
         "def task(env, agent):\n"
         "    return run_checkers({'ok': lambda: True})\n"
     )
@@ -128,7 +128,7 @@ async def test_task_config_passed_to_env(tmp_path):
 
 @pytest.mark.asyncio
 async def test_agent_workspace_config_merged(tmp_path):
-    """Agent workspace_config() is merged into task config; agent wins on image."""
+    """Agent workspace_config() is merged into task capabilities_config; agent wins on image."""
     task_dir = tmp_path / "t"
     task_dir.mkdir()
     (task_dir / "task.py").write_text(
@@ -136,7 +136,7 @@ async def test_agent_workspace_config_merged(tmp_path):
         "from terrarium.task.checking import run_checkers\n"
         "\n"
         "@entry(capabilities=['workspace'],\n"
-        "       config={'workspace': {'image': 'task-img', 'command': 'sleep 1'}})\n"
+        "       capabilities_config={'workspace': {'image': 'task-img', 'command': 'sleep 1'}})\n"
         "def task(env, agent):\n"
         "    return run_checkers({'ok': lambda: True})\n"
     )

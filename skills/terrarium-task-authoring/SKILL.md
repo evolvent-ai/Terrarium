@@ -50,12 +50,12 @@ def my_task(env, agent):
 
 ### Configuring capabilities
 
-Pass per-capability options via the optional `config` keyword. Keys match the entries in `capabilities` (`"<type>"` or `"<type>:<instance>"`), values are forwarded to the capability constructor.
+Pass per-capability options via the optional `capabilities_config` keyword. Keys match the entries in `capabilities` (`"<type>"` or `"<type>:<instance>"`), values are forwarded to the capability constructor.
 
 ```python
 @entry(
     capabilities=["postgres", "email"],
-    config={
+    capabilities_config={
         "postgres": {"db_name": "shop", "port": 5433},
         "email": {"smtp_port": 3125},
     },
@@ -69,11 +69,14 @@ Only set keys you want to override — every capability has defaults. See the re
 ```python
 @entry(
     capabilities=["postgres:primary", "postgres:analytics"],
-    config={"postgres:primary": {"db_name": "main"}, "postgres:analytics": {"db_name": "warehouse"}},
+    capabilities_config={
+        "postgres:primary": {"db_name": "main"},
+        "postgres:analytics": {"db_name": "warehouse"},
+    },
 )
 ```
 
-The agent's own workspace image always wins over any `workspace` config the task declares (the image has the agent CLI pre-installed), but other workspace keys pass through.
+The agent's own workspace image always wins over any `workspace` entry the task declares (the image has the agent CLI pre-installed), but other workspace keys pass through.
 
 ## Driving the Agent
 
@@ -295,7 +298,7 @@ Each yielded dict becomes a full `Task`:
 | `name` | yes | Task instance name (shows up in trial names and metrics) |
 | `params` | yes | kwargs injected into the entry function |
 | `capabilities` | no | Override `@entry(capabilities=...)` for this instance |
-| `config` | no | Override `@entry(config=...)` for this instance |
+| `capabilities_config` | no | Override `@entry(capabilities_config=...)` for this instance |
 
 Each yielded item becomes an independent task (its own trial, its own metrics). Disk layout stays minimal — **one directory, one `task.py`** — instead of N near-identical directories.
 

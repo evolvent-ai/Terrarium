@@ -34,36 +34,36 @@ def test_preserves_name():
     assert my_task.__doc__ == "My task docstring."
 
 
-def test_config_default_empty():
-    """Without an explicit config, _terrarium_config is an empty dict."""
+def test_capabilities_config_default_empty():
+    """Without an explicit capabilities_config, the wrapper attribute is an empty dict."""
     @entry(capabilities=["workspace"])
     def my_task(env, agent):
         pass
 
-    assert my_task._terrarium_config == {}
+    assert my_task._terrarium_capabilities_config == {}
 
 
-def test_config_stored():
-    """Config passed to @entry is attached to the wrapper."""
+def test_capabilities_config_stored():
+    """capabilities_config passed to @entry is attached to the wrapper."""
     cfg = {"postgres": {"db_name": "shop", "port": 5433}}
 
-    @entry(capabilities=["postgres"], config=cfg)
+    @entry(capabilities=["postgres"], capabilities_config=cfg)
     def my_task(env, agent):
         pass
 
-    assert my_task._terrarium_config == cfg
+    assert my_task._terrarium_capabilities_config == cfg
 
 
-def test_config_is_copied():
-    """@entry snapshots the config so later mutation of the input doesn't leak."""
+def test_capabilities_config_is_copied():
+    """@entry snapshots capabilities_config so later mutation doesn't leak."""
     cfg = {"postgres": {"db_name": "shop"}}
 
-    @entry(capabilities=["postgres"], config=cfg)
+    @entry(capabilities=["postgres"], capabilities_config=cfg)
     def my_task(env, agent):
         pass
 
     cfg["postgres"]["db_name"] = "other"
-    assert my_task._terrarium_config["postgres"] == {"db_name": "shop"}
+    assert my_task._terrarium_capabilities_config["postgres"] == {"db_name": "shop"}
 
 
 def test_parameterize_default():
