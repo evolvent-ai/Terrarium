@@ -206,10 +206,11 @@ def params():
         yield {"name": f"retail_task_{i}", "params": {"task_index": i}}
 ```
 
-Each yielded item becomes a full `Task` instance with its own name, metrics, and trial results. Optionally override `capabilities` per instance:
+Each yielded item becomes a full `Task` instance with its own name, metrics, and trial results. Optionally override `capabilities` or `capabilities_config` per instance:
 
 ```python
 yield {"name": "with_db", "params": {...}, "capabilities": ["workspace", "postgres"]}
+yield {"name": "alt_db", "params": {...}, "capabilities_config": {"postgres": {"db_name": "alt"}}}
 ```
 
 The directory layout stays minimal — **one directory, one `task.py`** — instead of N near-identical directories.
