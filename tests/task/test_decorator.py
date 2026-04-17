@@ -34,6 +34,27 @@ def test_preserves_name():
     assert my_task.__doc__ == "My task docstring."
 
 
+def test_capabilities_default_empty():
+    """Without an explicit capabilities, the wrapper attribute is an empty list."""
+    @entry()
+    def my_task(env, agent):
+        pass
+
+    assert my_task._terrarium_capabilities == []
+
+
+def test_capabilities_is_copied():
+    """@entry snapshots capabilities so later mutation doesn't leak."""
+    caps = ["postgres"]
+
+    @entry(capabilities=caps)
+    def my_task(env, agent):
+        pass
+
+    caps.append("email")
+    assert my_task._terrarium_capabilities == ["postgres"]
+
+
 def test_capabilities_config_default_empty():
     """Without an explicit capabilities_config, the wrapper attribute is an empty dict."""
     @entry(capabilities=["workspace"])
