@@ -22,22 +22,28 @@ class BuildSpec(BaseModel):
     dockerfile: str = "Dockerfile"
 
 
+class ImageSpec(BaseModel):
+    """Image source for a sandbox."""
+
+    name: str | None = None
+    build: BuildSpec | None = None
+
+    @model_validator(mode="after")
+    def _require_name_or_build(self) -> "ImageSpec":
+        if self.name is None and self.build is None:
+            raise ValueError("ImageSpec needs 'name' or 'build'")
+        return self
+
+
 class SandboxSpec(BaseModel):
     """Configuration needed to run a sandbox."""
 
-    image: str | None = None
-    build: BuildSpec | None = None
+    image: ImageSpec
     ports: list[int] = Field(default_factory=list)
     env: dict[str, str] = Field(default_factory=dict)
     volumes: dict[str, str] = Field(default_factory=dict)
     command: str | list[str] | None = None
     name: str | None = None
-
-    @model_validator(mode="after")
-    def _require_image_or_build(self) -> "SandboxSpec":
-        if self.image is None and self.build is None:
-            raise ValueError("SandboxSpec needs 'image' or 'build'")
-        return self
 
 
 class Sandbox(ABC):

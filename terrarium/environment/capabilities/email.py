@@ -58,7 +58,7 @@ class EmailCapability(BaseCapability):
         imap = config.get("imap_port", DEFAULT_IMAP_PORT)
         pop3 = config.get("pop3_port", DEFAULT_POP3_PORT)
         return SandboxSpec(
-            image=config.get("image", DEFAULT_IMAGE),
+            image=config.get("image") or {"name": DEFAULT_IMAGE},
             ports=[smtp, imap, pop3],
         )
 

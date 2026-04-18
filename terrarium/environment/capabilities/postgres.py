@@ -43,7 +43,7 @@ class PostgresCapability(BaseCapability):
     def sandbox_spec(cls, config=None) -> SandboxSpec:
         config = config or {}
         return SandboxSpec(
-            image=config.get("image", DEFAULT_IMAGE),
+            image=config.get("image") or {"name": DEFAULT_IMAGE},
             ports=[config.get("port", DEFAULT_PORT)],
             env={
                 "POSTGRES_PASSWORD": config.get("password", DEFAULT_DB_PASSWORD),

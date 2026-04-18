@@ -100,7 +100,7 @@ class CodexAgent(BaseAgent):
 
     @classmethod
     def workspace_config(cls) -> dict:
-        return {"image": DEFAULT_IMAGE}
+        return {"image": {"name": DEFAULT_IMAGE}}
 
     def setup(self, workspace, conn_info: dict) -> None:
         self._workspace = workspace

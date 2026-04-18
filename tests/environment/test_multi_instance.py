@@ -30,7 +30,7 @@ class FakeApiCap(BaseCapability):
 class FakeSandboxCap(BaseCapability):
     @classmethod
     def sandbox_spec(cls, config=None):
-        return SandboxSpec(image="fake:latest", ports=[1234])
+        return SandboxSpec(image={"name": "fake:latest"}, ports=[1234])
 
     def wait_ready(self):
         pass
@@ -167,7 +167,7 @@ def test_multi_instance_teardown_called_for_each():
     class TrackingFakeCap(BaseCapability):
         @classmethod
         def sandbox_spec(cls, config=None):
-            return SandboxSpec(image="fake:latest")
+            return SandboxSpec(image={"name": "fake:latest"})
         def wait_ready(self):
             pass
         def teardown(self):

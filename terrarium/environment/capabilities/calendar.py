@@ -41,7 +41,7 @@ class CalendarCapability(BaseCapability):
         config = config or {}
         port = config.get("port", DEFAULT_PORT)
         return SandboxSpec(
-            image=config.get("image", DEFAULT_IMAGE),
+            image=config.get("image") or {"name": DEFAULT_IMAGE},
             ports=[port],
             env={"RADICALE_CONFIG_AUTH_TYPE": "none"},
         )

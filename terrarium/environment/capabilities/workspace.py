@@ -20,19 +20,19 @@ class WorkspaceCapability(BaseCapability):
     manage files. User picks the image via config.
 
     Config options:
-        image:   Docker image (default: "ubuntu:24.04")
+        image:   ImageSpec dict (default: {"name": "ubuntu:24.04"})
         command: Override container entrypoint (default: sleep infinity)
     """
 
     def __init__(self, config=None, sandbox=None):
         super().__init__(config, sandbox)
-        self._image = self._config.get("image", DEFAULT_IMAGE)
+        self._image = self._config.get("image", {"name": DEFAULT_IMAGE}).get("name")
 
     @classmethod
     def sandbox_spec(cls, config=None) -> SandboxSpec:
         config = config or {}
         return SandboxSpec(
-            image=config.get("image", DEFAULT_IMAGE),
+            image=config.get("image") or {"name": DEFAULT_IMAGE},
             command=config.get("command", ["tail", "-f", "/dev/null"]),
         )
 
@@ -42,7 +42,7 @@ class WorkspaceCapability(BaseCapability):
         while time.monotonic() < deadline:
             result = self._sandbox.exec(["echo", "ready"])
             if result.exit_code == 0:
-                logger.info("Workspace ready: image={}", self._image)
+                logger.info("Workspace ready: image={}", self._image or "<built>")
                 return
             time.sleep(0.5)
         raise CapabilityError(f"Workspace not ready after {timeout}s")
