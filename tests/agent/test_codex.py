@@ -75,8 +75,11 @@ def _make_session(session_id="thread-1", *entries):
 
 
 def _make_agent(shell_responses=None):
-    responses = shell_responses or [_FakeExecResult(stdout="codex-cli 0.118.0")]
-    workspace = _FakeWorkspace(shell_responses=responses)
+    # setup() starts with `command -v codex` to decide whether to install;
+    # prepend a success so the install path is skipped in unit tests.
+    install_check = _FakeExecResult(exit_code=0, stdout="/usr/local/bin/codex")
+    extra = shell_responses or [_FakeExecResult(stdout="codex-cli 0.118.0")]
+    workspace = _FakeWorkspace(shell_responses=[install_check, *extra])
     agent = CodexAgent(model="gpt-5.4", api_key="sk-test")
     return agent, workspace
 
@@ -124,6 +127,40 @@ class TestBuildCommand:
         cmd = agent._build_command("test")
         assert "OPENAI_API_KEY=" in cmd
         assert "sk-test" in cmd
+
+
+class TestEnsureInstalled:
+    def test_skips_install_when_present(self):
+        """If `codex` is on PATH, no install command is run."""
+        agent = CodexAgent()
+        agent._workspace = _FakeWorkspace(shell_responses=[
+            _FakeExecResult(exit_code=0, stdout="/usr/local/bin/codex"),
+        ])
+        agent._ensure_installed()
+        assert agent._workspace.shell.commands == ["command -v codex"]
+
+    def test_runs_install_when_missing(self):
+        """If `codex` is absent, the install script is executed."""
+        agent = CodexAgent()
+        agent._workspace = _FakeWorkspace(shell_responses=[
+            _FakeExecResult(exit_code=1),
+            _FakeExecResult(exit_code=0),
+        ])
+        agent._ensure_installed()
+        cmds = agent._workspace.shell.commands
+        assert len(cmds) == 2
+        assert cmds[0] == "command -v codex"
+        assert "npm install -g @openai/codex" in cmds[1]
+
+    def test_raises_when_install_fails(self):
+        """RuntimeError is raised if the install script exits non-zero."""
+        agent = CodexAgent()
+        agent._workspace = _FakeWorkspace(shell_responses=[
+            _FakeExecResult(exit_code=1),
+            _FakeExecResult(exit_code=1, stderr="npm ENOENT"),
+        ])
+        with pytest.raises(RuntimeError, match="Failed to install Codex CLI"):
+            agent._ensure_installed()
 
 
 class TestSessionFileDiscovery:

@@ -34,6 +34,39 @@ SESSION_DIR = f"{CODEX_HOME}/sessions"
 AUTH_PATH = f"{CODEX_HOME}/auth.json"
 SKILLS_DIR = "/root/.agents/skills"
 
+CODEX_INSTALL_SCRIPT = """\
+set -e
+export DEBIAN_FRONTEND=noninteractive
+if command -v apk >/dev/null 2>&1; then
+    apk add --no-cache curl bash nodejs npm ripgrep
+    npm install -g @openai/codex
+    exit 0
+fi
+
+if ! command -v curl >/dev/null 2>&1; then
+    if command -v apt-get >/dev/null 2>&1; then apt-get update && apt-get install -y curl ripgrep
+    elif command -v yum >/dev/null 2>&1; then yum install -y curl ripgrep
+    else echo "No supported package manager (apk/apt-get/yum)" >&2; exit 1
+    fi
+fi
+
+curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh | bash
+export NVM_DIR="$HOME/.nvm"
+. "$NVM_DIR/nvm.sh" || true
+command -v nvm >/dev/null || { echo "NVM failed to load" >&2; exit 1; }
+nvm install 22
+nvm alias default 22
+
+npm install -g @openai/codex
+
+for bin in node codex; do
+    p=$(command -v "$bin" 2>/dev/null || true)
+    if [ -n "$p" ] && [ "$p" != "/usr/local/bin/$bin" ]; then
+        ln -sf "$p" "/usr/local/bin/$bin"
+    fi
+done
+"""
+
 
 class CodexAgent(BaseAgent):
     """Codex CLI agent running inside the workspace container.
@@ -71,9 +104,22 @@ class CodexAgent(BaseAgent):
 
     def setup(self, workspace, conn_info: dict) -> None:
         self._workspace = workspace
+        self._ensure_installed()
         self._version = self._detect_version()
         self._write_auth()
         logger.info("Codex agent ready: version={}", self._version)
+
+    def _ensure_installed(self) -> None:
+        check = self._workspace.shell.exec("command -v codex")
+        if check.exit_code == 0:
+            return
+        logger.info("Codex CLI not found in workspace, installing...")
+        result = self._workspace.shell.exec(CODEX_INSTALL_SCRIPT)
+        if result.exit_code != 0:
+            raise RuntimeError(
+                f"Failed to install Codex CLI (exit {result.exit_code}): "
+                f"{result.stderr or result.stdout}"
+            )
 
     def install_skill(self, path: str | Path) -> None:
         path = Path(path).resolve()

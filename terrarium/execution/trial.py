@@ -121,10 +121,10 @@ class Trial:
         if ws_config is not None:
             if "workspace" not in capabilities:
                 capabilities.append("workspace")
-            # Agent's workspace config wins — it pins the image that has the
-            # agent CLI pre-installed. Task-declared workspace options fill in
-            # the rest (e.g. custom command).
-            caps_config["workspace"] = {**caps_config.get("workspace", {}), **ws_config}
+            # Task's workspace config wins; agent's is a fallback default.
+            # Agents provision themselves in setup() if the task-chosen image
+            # doesn't already have what they need.
+            caps_config["workspace"] = {**ws_config, **caps_config.get("workspace", {})}
         return ComposableEnvironment(capabilities=capabilities, config=caps_config)
 
     def _collect_conn_info(self, env: ComposableEnvironment) -> dict:
