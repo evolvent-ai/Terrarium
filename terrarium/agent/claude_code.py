@@ -33,6 +33,25 @@ from terrarium.models.trajectory import (
 DEFAULT_IMAGE = "terrarium/claude-code:latest"
 SKILLS_DIR = "/root/.claude/skills"
 
+CLAUDE_INSTALL_SCRIPT = """\
+set -e
+export DEBIAN_FRONTEND=noninteractive
+if command -v apk >/dev/null 2>&1; then
+    apk add --no-cache curl bash nodejs npm
+    npm install -g @anthropic-ai/claude-code
+    exit 0
+fi
+
+if ! command -v curl >/dev/null 2>&1; then
+    if command -v apt-get >/dev/null 2>&1; then apt-get update && apt-get install -y curl
+    elif command -v yum >/dev/null 2>&1; then yum install -y curl
+    else echo "No supported package manager (apk/apt-get/yum)" >&2; exit 1
+    fi
+fi
+curl -fsSL https://claude.ai/install.sh | bash
+ln -sf "$HOME/.local/bin/claude" /usr/local/bin/claude
+"""
+
 
 class ClaudeCodeAgent(BaseAgent):
     """Claude Code CLI agent running inside the workspace container.
@@ -71,8 +90,21 @@ class ClaudeCodeAgent(BaseAgent):
 
     def setup(self, workspace, conn_info: dict) -> None:
         self._workspace = workspace
+        self._ensure_installed()
         self._version = self._detect_version()
         logger.info("Claude Code agent ready: version={}", self._version)
+
+    def _ensure_installed(self) -> None:
+        check = self._workspace.shell.exec("command -v claude")
+        if check.exit_code == 0:
+            return
+        logger.info("Claude Code CLI not found in workspace; installing...")
+        result = self._workspace.shell.exec(CLAUDE_INSTALL_SCRIPT)
+        if result.exit_code != 0:
+            raise RuntimeError(
+                f"Failed to install Claude Code CLI (exit {result.exit_code}): "
+                f"{result.stderr or result.stdout}"
+            )
 
     def install_skill(self, path: str | Path) -> None:
         path = Path(path).resolve()
