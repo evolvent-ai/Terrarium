@@ -207,7 +207,7 @@ class DockerSandboxProvider(SandboxProvider):
                 tag=tag,
                 rm=True,
             )
-        except docker.errors.BuildError as e:
+        except docker.errors.DockerException as e:
             raise ProviderError(f"Failed to build image from {build.context}: {e}") from e
         return tag
 
