@@ -32,6 +32,24 @@ DEFAULT_IMAGE = "terrarium/openclaw:latest"
 SESSION_DIR = "/root/.openclaw/agents/main/sessions"
 SKILLS_DIR = "/root/.openclaw/workspace/skills"
 
+OPENCLAW_INSTALL_SCRIPT = """\
+set -e
+export DEBIAN_FRONTEND=noninteractive
+if command -v apk >/dev/null 2>&1; then
+    apk add --no-cache curl bash nodejs npm
+    npm install -g openclaw
+    exit 0
+fi
+
+if ! command -v curl >/dev/null 2>&1; then
+    if command -v apt-get >/dev/null 2>&1; then apt-get update && apt-get install -y curl
+    elif command -v yum >/dev/null 2>&1; then yum install -y curl
+    else echo "No supported package manager (apk/apt-get/yum)" >&2; exit 1
+    fi
+fi
+curl -fsSL https://openclaw.ai/install.sh | bash -s -- --no-onboard
+"""
+
 class OpenClawAgent(BaseAgent):
     """OpenClaw CLI agent running inside the workspace container.
 
@@ -67,10 +85,23 @@ class OpenClawAgent(BaseAgent):
 
     def setup(self, workspace, conn_info: dict) -> None:
         self._workspace = workspace
+        self._ensure_installed()
         self._version = self._detect_version()
         self._write_config()
         self._session_id = str(uuid.uuid4())
         logger.info("OpenClaw agent ready: version={}", self._version)
+
+    def _ensure_installed(self) -> None:
+        check = self._workspace.shell.exec("command -v openclaw")
+        if check.exit_code == 0:
+            return
+        logger.info("OpenClaw CLI not found in workspace, installing...")
+        result = self._workspace.shell.exec(OPENCLAW_INSTALL_SCRIPT)
+        if result.exit_code != 0:
+            raise RuntimeError(
+                f"Failed to install OpenClaw CLI (exit {result.exit_code}): "
+                f"{result.stderr or result.stdout}"
+            )
 
     def install_skill(self, path: str | Path) -> None:
         """Install a skill into the agent. Uploads to ~/.openclaw/workspace/skills/."""

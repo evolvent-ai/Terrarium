@@ -45,8 +45,10 @@ class _FakeShell:
     def __init__(self, responses=None):
         self._responses = responses or []
         self._call_index = 0
+        self.commands: list[str] = []
 
     def exec(self, command, timeout=None):
+        self.commands.append(command)
         if self._call_index < len(self._responses):
             result = self._responses[self._call_index]
             self._call_index += 1
@@ -70,8 +72,11 @@ def models_config(tmp_path):
 
 
 def _make_agent(models_config, shell_responses=None):
-    responses = shell_responses or [_FakeExecResult(stdout="openclaw version 2026.4.1")]
-    workspace = _FakeWorkspace(shell_responses=responses)
+    # setup() starts with `command -v openclaw` to decide whether to install;
+    # prepend a success so the install path is skipped in unit tests.
+    install_check = _FakeExecResult(exit_code=0, stdout="/usr/local/bin/openclaw")
+    extra = shell_responses or [_FakeExecResult(stdout="openclaw version 2026.4.1")]
+    workspace = _FakeWorkspace(shell_responses=[install_check, *extra])
     agent = OpenClawAgent(models_config_path=models_config)
     agent._workspace = workspace
     return agent, workspace
@@ -138,6 +143,40 @@ class TestParseSessionMessage:
         assert _parse_session_message({"role": "system"}) is None
 
 
+class TestEnsureInstalled:
+    def test_skips_install_when_present(self, models_config):
+        """If `openclaw` is on PATH, no install command is run."""
+        agent = OpenClawAgent(models_config_path=models_config)
+        agent._workspace = _FakeWorkspace(shell_responses=[
+            _FakeExecResult(exit_code=0, stdout="/usr/local/bin/openclaw"),
+        ])
+        agent._ensure_installed()
+        assert agent._workspace.shell.commands == ["command -v openclaw"]
+
+    def test_runs_install_when_missing(self, models_config):
+        """If `openclaw` is absent, the install script is executed."""
+        agent = OpenClawAgent(models_config_path=models_config)
+        agent._workspace = _FakeWorkspace(shell_responses=[
+            _FakeExecResult(exit_code=1),
+            _FakeExecResult(exit_code=0),
+        ])
+        agent._ensure_installed()
+        cmds = agent._workspace.shell.commands
+        assert len(cmds) == 2
+        assert cmds[0] == "command -v openclaw"
+        assert "openclaw.ai/install.sh" in cmds[1]
+
+    def test_raises_when_install_fails(self, models_config):
+        """RuntimeError is raised if the install script exits non-zero."""
+        agent = OpenClawAgent(models_config_path=models_config)
+        agent._workspace = _FakeWorkspace(shell_responses=[
+            _FakeExecResult(exit_code=1),
+            _FakeExecResult(exit_code=1, stderr="curl: 404"),
+        ])
+        with pytest.raises(RuntimeError, match="Failed to install OpenClaw CLI"):
+            agent._ensure_installed()
+
+
 class TestSetup:
     def test_writes_config(self, tmp_path):
         """Writes openclaw.json with models config and exec security."""
@@ -149,6 +188,7 @@ class TestSetup:
         config_file.write_text(json.dumps(models_config))
 
         workspace = _FakeWorkspace(shell_responses=[
+            _FakeExecResult(exit_code=0, stdout="/usr/local/bin/openclaw"),  # command -v openclaw
             _FakeExecResult(stdout="openclaw version 2026.4.1"),
         ])
         agent = OpenClawAgent(model="mycloud/m", models_config_path=str(config_file))

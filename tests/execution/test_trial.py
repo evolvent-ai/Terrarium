@@ -133,7 +133,7 @@ async def test_task_capabilities_config_passed_to_env(tmp_path):
 
 @pytest.mark.asyncio
 async def test_agent_workspace_config_merged(tmp_path):
-    """Agent workspace_config() is merged into task capabilities_config; agent wins on image."""
+    """Task's workspace config wins over agent's; agent config is fallback default."""
     task_dir = _write_task(
         tmp_path / "t",
         "capabilities=['workspace'], "
@@ -149,8 +149,24 @@ async def test_agent_workspace_config_merged(tmp_path):
 
     _, kwargs = env_ctor.call_args
     assert kwargs["capabilities"] == ["workspace"]
-    # Agent overrides image; task's 'command' survives.
-    assert kwargs["config"]["workspace"] == {"image": "agent-img", "command": "sleep 1"}
+    # Task's image wins; task's 'command' kept; agent's image becomes a no-op.
+    assert kwargs["config"]["workspace"] == {"image": "task-img", "command": "sleep 1"}
+
+
+@pytest.mark.asyncio
+async def test_agent_workspace_image_is_fallback(tmp_path):
+    """When the task doesn't declare a workspace image, agent's image is used."""
+    task_dir = _write_task(tmp_path / "t", "capabilities=[]")
+
+    from tests.agent.mock import MockAgent
+
+    mock_rt = _make_mock_rt()
+    with patch.object(MockAgent, "workspace_config", classmethod(lambda cls: {"image": "agent-img"})), \
+         patch("terrarium.execution.trial.ComposableEnvironment", return_value=mock_rt) as env_ctor:
+        await Trial(_make_config(task_dir=task_dir)).run()
+
+    _, kwargs = env_ctor.call_args
+    assert kwargs["config"]["workspace"] == {"image": "agent-img"}
 
 
 @pytest.mark.asyncio

@@ -3,6 +3,13 @@ import pytest
 from terrarium.agent.claude_code import SKILLS_DIR, ClaudeCodeAgent
 
 
+class _FakeExecResult:
+    def __init__(self, exit_code=0, stdout="", stderr=""):
+        self.exit_code = exit_code
+        self.stdout = stdout
+        self.stderr = stderr
+
+
 class _FakeFS:
     def __init__(self):
         self.make_dir_calls: list[str] = []
@@ -15,15 +22,62 @@ class _FakeFS:
         self.upload_calls.append((local_path, sandbox_path))
 
 
+class _FakeShell:
+    def __init__(self, responses=None):
+        self._responses = responses or []
+        self._call_index = 0
+        self.commands: list[str] = []
+
+    def exec(self, command, timeout=None):
+        self.commands.append(command)
+        if self._call_index < len(self._responses):
+            result = self._responses[self._call_index]
+            self._call_index += 1
+            return result
+        return _FakeExecResult()
+
+
 class _FakeWorkspace:
-    def __init__(self):
+    def __init__(self, shell_responses=None):
         self.fs = _FakeFS()
+        self.shell = _FakeShell(shell_responses)
 
 
-def _make_agent():
+def _make_agent(shell_responses=None):
     agent = ClaudeCodeAgent()
-    agent._workspace = _FakeWorkspace()
+    agent._workspace = _FakeWorkspace(shell_responses=shell_responses)
     return agent
+
+
+class TestEnsureInstalled:
+    def test_skips_install_when_present(self):
+        """If `claude` is on PATH, no install command is run."""
+        agent = _make_agent(shell_responses=[
+            _FakeExecResult(exit_code=0, stdout="/usr/local/bin/claude"),
+        ])
+        agent._ensure_installed()
+        assert agent._workspace.shell.commands == ["command -v claude"]
+
+    def test_runs_install_when_missing(self):
+        """If `claude` is absent, the install script is executed."""
+        agent = _make_agent(shell_responses=[
+            _FakeExecResult(exit_code=1),  # command -v claude → not found
+            _FakeExecResult(exit_code=0),  # install succeeds
+        ])
+        agent._ensure_installed()
+        cmds = agent._workspace.shell.commands
+        assert len(cmds) == 2
+        assert cmds[0] == "command -v claude"
+        assert "claude.ai/install.sh" in cmds[1]
+
+    def test_raises_when_install_fails(self):
+        """RuntimeError is raised if the install script exits non-zero."""
+        agent = _make_agent(shell_responses=[
+            _FakeExecResult(exit_code=1),
+            _FakeExecResult(exit_code=1, stderr="install.sh 404"),
+        ])
+        with pytest.raises(RuntimeError, match="Failed to install Claude Code CLI"):
+            agent._ensure_installed()
 
 
 class TestInstallSkill:
