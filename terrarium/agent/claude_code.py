@@ -98,7 +98,7 @@ class ClaudeCodeAgent(BaseAgent):
         check = self._workspace.shell.exec("command -v claude")
         if check.exit_code == 0:
             return
-        logger.info("Claude Code CLI not found in workspace; installing...")
+        logger.info("Claude Code CLI not found in workspace, installing...")
         result = self._workspace.shell.exec(CLAUDE_INSTALL_SCRIPT)
         if result.exit_code != 0:
             raise RuntimeError(

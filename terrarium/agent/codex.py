@@ -113,7 +113,7 @@ class CodexAgent(BaseAgent):
         check = self._workspace.shell.exec("command -v codex")
         if check.exit_code == 0:
             return
-        logger.info("Codex CLI not found in workspace; installing...")
+        logger.info("Codex CLI not found in workspace, installing...")
         result = self._workspace.shell.exec(CODEX_INSTALL_SCRIPT)
         if result.exit_code != 0:
             raise RuntimeError(

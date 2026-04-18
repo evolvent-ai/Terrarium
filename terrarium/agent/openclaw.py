@@ -95,7 +95,7 @@ class OpenClawAgent(BaseAgent):
         check = self._workspace.shell.exec("command -v openclaw")
         if check.exit_code == 0:
             return
-        logger.info("OpenClaw CLI not found in workspace; installing...")
+        logger.info("OpenClaw CLI not found in workspace, installing...")
         result = self._workspace.shell.exec(OPENCLAW_INSTALL_SCRIPT)
         if result.exit_code != 0:
             raise RuntimeError(
