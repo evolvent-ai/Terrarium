@@ -149,7 +149,9 @@ class DockerSandboxProvider(SandboxProvider):
             self._network = self._client.networks.create(network_name, driver="bridge")
 
     def create(self, spec: SandboxSpec) -> Sandbox:
-        image_name = self._ensure_built(spec.build) if spec.build else spec.image
+        image_name = (
+            self._ensure_built(spec.build, spec.image) if spec.build else spec.image
+        )
         port_bindings = {f"{p}/tcp": None for p in spec.ports}
         environment = spec.env or {}
         volumes = spec.volumes or {}
@@ -188,8 +190,8 @@ class DockerSandboxProvider(SandboxProvider):
         self._sandboxes.append(sandbox)
         return sandbox
 
-    def _ensure_built(self, build: BuildSpec) -> str:
-        tag = build.tag or self._auto_tag(build)
+    def _ensure_built(self, build: BuildSpec, tag: str | None) -> str:
+        tag = tag or self._auto_tag(build)
         try:
             self._client.images.get(tag)
             logger.debug("Build cache hit: {}", tag)

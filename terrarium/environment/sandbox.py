@@ -20,15 +20,10 @@ class BuildSpec(BaseModel):
 
     context: str
     dockerfile: str = "Dockerfile"
-    tag: str | None = None
 
 
 class SandboxSpec(BaseModel):
-    """Configuration needed to run a sandbox.
-
-    Exactly one of `image` (pull an existing image) or `build` (build from a
-    Dockerfile) must be set.
-    """
+    """Configuration needed to run a sandbox."""
 
     image: str | None = None
     build: BuildSpec | None = None
@@ -39,11 +34,9 @@ class SandboxSpec(BaseModel):
     name: str | None = None
 
     @model_validator(mode="after")
-    def _require_exactly_one_source(self) -> "SandboxSpec":
-        if (self.image is None) == (self.build is None):
-            raise ValueError(
-                "SandboxSpec requires exactly one of 'image' or 'build'"
-            )
+    def _require_image_or_build(self) -> "SandboxSpec":
+        if self.image is None and self.build is None:
+            raise ValueError("SandboxSpec needs 'image' or 'build'")
         return self
 
 

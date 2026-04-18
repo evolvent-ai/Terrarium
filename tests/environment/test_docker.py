@@ -109,7 +109,7 @@ class TestDockerSandboxProvider:
         client.images.build.assert_not_called()
 
     @patch("terrarium.environment.providers.docker.docker.from_env")
-    def test_create_with_build_honors_explicit_tag(self, mock_from_env, tmp_path):
+    def test_create_with_build_honors_caller_tag(self, mock_from_env, tmp_path):
         (tmp_path / "Dockerfile").write_text("FROM alpine\n")
         client = MagicMock()
         mock_from_env.return_value = client
@@ -120,7 +120,7 @@ class TestDockerSandboxProvider:
 
         provider = DockerSandboxProvider()
         provider.setup()
-        provider.create(SandboxSpec(build=BuildSpec(context=str(tmp_path), tag="custom:v1")))
+        provider.create(SandboxSpec(image="custom:v1", build=BuildSpec(context=str(tmp_path))))
 
         assert client.images.build.call_args.kwargs["tag"] == "custom:v1"
         assert client.containers.run.call_args.kwargs["image"] == "custom:v1"

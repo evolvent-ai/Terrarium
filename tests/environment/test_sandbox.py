@@ -40,21 +40,20 @@ def test_sandbox_spec_full():
     assert spec.command == ["postgres", "-c", "max_connections=100"]
 
 
-def test_sandbox_spec_with_build():
+def test_sandbox_spec_with_build_only():
     spec = SandboxSpec(build=BuildSpec(context="/path/to/ctx"))
     assert spec.image is None
     assert spec.build.context == "/path/to/ctx"
-    assert spec.build.dockerfile == "Dockerfile"
-    assert spec.build.tag is None
 
 
-def test_sandbox_spec_rejects_both_image_and_build():
-    with pytest.raises(ValueError, match="exactly one"):
-        SandboxSpec(image="x:1", build=BuildSpec(context="/ctx"))
+def test_sandbox_spec_with_image_and_build():
+    spec = SandboxSpec(image="my-name:1", build=BuildSpec(context="/ctx"))
+    assert spec.image == "my-name:1"
+    assert spec.build.context == "/ctx"
 
 
 def test_sandbox_spec_rejects_neither():
-    with pytest.raises(ValueError, match="exactly one"):
+    with pytest.raises(ValueError, match="needs 'image' or 'build'"):
         SandboxSpec()
 
 
@@ -62,13 +61,11 @@ def test_build_spec_defaults():
     b = BuildSpec(context="/ctx")
     assert b.context == "/ctx"
     assert b.dockerfile == "Dockerfile"
-    assert b.tag is None
 
 
-def test_build_spec_custom_dockerfile_and_tag():
-    b = BuildSpec(context="/ctx", dockerfile="custom.Dockerfile", tag="my-image:1")
+def test_build_spec_custom_dockerfile():
+    b = BuildSpec(context="/ctx", dockerfile="custom.Dockerfile")
     assert b.dockerfile == "custom.Dockerfile"
-    assert b.tag == "my-image:1"
 
 
 def test_sandbox_is_abstract():
