@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ExecResult(BaseModel):
@@ -15,15 +15,36 @@ class ExecResult(BaseModel):
     stderr: str
 
 
-class SandboxSpec(BaseModel):
-    """Configuration needed to run a sandbox."""
+class BuildSpec(BaseModel):
+    """How to build a sandbox image from a Dockerfile."""
 
-    image: str
+    context: str
+    dockerfile: str = "Dockerfile"
+    tag: str | None = None
+
+
+class SandboxSpec(BaseModel):
+    """Configuration needed to run a sandbox.
+
+    Exactly one of `image` (pull an existing image) or `build` (build from a
+    Dockerfile) must be set.
+    """
+
+    image: str | None = None
+    build: BuildSpec | None = None
     ports: list[int] = Field(default_factory=list)
     env: dict[str, str] = Field(default_factory=dict)
     volumes: dict[str, str] = Field(default_factory=dict)
     command: str | list[str] | None = None
     name: str | None = None
+
+    @model_validator(mode="after")
+    def _require_exactly_one_source(self) -> "SandboxSpec":
+        if (self.image is None) == (self.build is None):
+            raise ValueError(
+                "SandboxSpec requires exactly one of 'image' or 'build'"
+            )
+        return self
 
 
 class Sandbox(ABC):

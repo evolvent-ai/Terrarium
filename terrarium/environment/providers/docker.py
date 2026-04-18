@@ -2,18 +2,20 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import os
 import posixpath
 import tarfile
 import uuid
+from pathlib import Path
 
 import docker
 import docker.errors
 from loguru import logger
 
 from terrarium.environment.exceptions import ProviderError, SandboxError
-from terrarium.environment.sandbox import ExecResult, Sandbox, SandboxSpec, SandboxProvider
+from terrarium.environment.sandbox import BuildSpec, ExecResult, Sandbox, SandboxSpec, SandboxProvider
 
 
 class DockerSandbox(Sandbox):
@@ -147,12 +149,13 @@ class DockerSandboxProvider(SandboxProvider):
             self._network = self._client.networks.create(network_name, driver="bridge")
 
     def create(self, spec: SandboxSpec) -> Sandbox:
+        image_name = self._ensure_built(spec.build) if spec.build else spec.image
         port_bindings = {f"{p}/tcp": None for p in spec.ports}
         environment = spec.env or {}
         volumes = spec.volumes or {}
 
         kwargs = {
-            "image": spec.image,
+            "image": image_name,
             "detach": True,
             "ports": port_bindings,
             "environment": environment,
@@ -175,15 +178,51 @@ class DockerSandboxProvider(SandboxProvider):
         if spec.command is not None:
             kwargs["command"] = spec.command
 
-        logger.info("Starting container: image={} name={}", spec.image, kwargs.get("name"))
+        logger.info("Starting container: image={} name={}", image_name, kwargs.get("name"))
         try:
             container = self._client.containers.run(**kwargs)
         except docker.errors.DockerException as e:
-            raise ProviderError(f"Failed to start container {spec.image}: {e}") from e
+            raise ProviderError(f"Failed to start container {image_name}: {e}") from e
 
         sandbox = DockerSandbox(container)
         self._sandboxes.append(sandbox)
         return sandbox
+
+    def _ensure_built(self, build: BuildSpec) -> str:
+        tag = build.tag or self._auto_tag(build)
+        try:
+            self._client.images.get(tag)
+            logger.debug("Build cache hit: {}", tag)
+            return tag
+        except docker.errors.ImageNotFound:
+            pass
+
+        logger.info("Building image: tag={} context={}", tag, build.context)
+        try:
+            self._client.images.build(
+                path=build.context,
+                dockerfile=build.dockerfile,
+                tag=tag,
+                rm=True,
+            )
+        except docker.errors.BuildError as e:
+            raise ProviderError(f"Failed to build image from {build.context}: {e}") from e
+        return tag
+
+    @staticmethod
+    def _auto_tag(build: BuildSpec) -> str:
+        """Deterministic tag derived from a hash of the build context."""
+        ctx = Path(build.context)
+        h = hashlib.sha256()
+        h.update(build.dockerfile.encode())
+        h.update(b"\0")
+        for f in sorted(ctx.rglob("*")):
+            if not f.is_file():
+                continue
+            h.update(f.relative_to(ctx).as_posix().encode())
+            h.update(b"\0")
+            h.update(f.read_bytes())
+        return f"terrarium-built:{h.hexdigest()[:16]}"
 
     def teardown(self) -> None:
         for sandbox in reversed(self._sandboxes):

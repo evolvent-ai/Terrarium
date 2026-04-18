@@ -1,7 +1,11 @@
 import pytest
 from unittest.mock import MagicMock, patch
+
+import docker.errors
+
+from terrarium.environment.exceptions import ProviderError
 from terrarium.environment.providers.docker import DockerSandbox, DockerSandboxProvider
-from terrarium.environment.sandbox import SandboxSpec
+from terrarium.environment.sandbox import BuildSpec, SandboxSpec
 
 
 class TestDockerSandbox:
@@ -65,3 +69,88 @@ class TestDockerSandboxProvider:
         provider.teardown()
         container.stop.assert_called_once()
         container.remove.assert_called_once()
+
+    @patch("terrarium.environment.providers.docker.docker.from_env")
+    def test_create_with_build_builds_and_runs(self, mock_from_env, tmp_path):
+        (tmp_path / "Dockerfile").write_text("FROM alpine\n")
+        client = MagicMock()
+        mock_from_env.return_value = client
+        client.images.get.side_effect = docker.errors.ImageNotFound("not built yet")
+        container = MagicMock()
+        container.ports = {}
+        client.containers.run.return_value = container
+
+        provider = DockerSandboxProvider()
+        provider.setup()
+        provider.create(SandboxSpec(build=BuildSpec(context=str(tmp_path))))
+
+        client.images.build.assert_called_once()
+        build_kwargs = client.images.build.call_args.kwargs
+        assert build_kwargs["path"] == str(tmp_path)
+        assert build_kwargs["dockerfile"] == "Dockerfile"
+        assert build_kwargs["tag"].startswith("terrarium-built:")
+
+        run_image = client.containers.run.call_args.kwargs["image"]
+        assert run_image == build_kwargs["tag"]
+
+    @patch("terrarium.environment.providers.docker.docker.from_env")
+    def test_create_with_build_uses_cache_when_tag_exists(self, mock_from_env, tmp_path):
+        (tmp_path / "Dockerfile").write_text("FROM alpine\n")
+        client = MagicMock()
+        mock_from_env.return_value = client
+        container = MagicMock()
+        container.ports = {}
+        client.containers.run.return_value = container
+
+        provider = DockerSandboxProvider()
+        provider.setup()
+        provider.create(SandboxSpec(build=BuildSpec(context=str(tmp_path))))
+
+        client.images.build.assert_not_called()
+
+    @patch("terrarium.environment.providers.docker.docker.from_env")
+    def test_create_with_build_honors_explicit_tag(self, mock_from_env, tmp_path):
+        (tmp_path / "Dockerfile").write_text("FROM alpine\n")
+        client = MagicMock()
+        mock_from_env.return_value = client
+        client.images.get.side_effect = docker.errors.ImageNotFound("")
+        container = MagicMock()
+        container.ports = {}
+        client.containers.run.return_value = container
+
+        provider = DockerSandboxProvider()
+        provider.setup()
+        provider.create(SandboxSpec(build=BuildSpec(context=str(tmp_path), tag="custom:v1")))
+
+        assert client.images.build.call_args.kwargs["tag"] == "custom:v1"
+        assert client.containers.run.call_args.kwargs["image"] == "custom:v1"
+
+    @patch("terrarium.environment.providers.docker.docker.from_env")
+    def test_create_with_build_propagates_build_errors(self, mock_from_env, tmp_path):
+        (tmp_path / "Dockerfile").write_text("FROM alpine\n")
+        client = MagicMock()
+        mock_from_env.return_value = client
+        client.images.get.side_effect = docker.errors.ImageNotFound("")
+        client.images.build.side_effect = docker.errors.BuildError("bad syntax", build_log=[])
+
+        provider = DockerSandboxProvider()
+        provider.setup()
+        with pytest.raises(ProviderError, match="Failed to build"):
+            provider.create(SandboxSpec(build=BuildSpec(context=str(tmp_path))))
+
+
+class TestAutoTag:
+    def test_same_context_yields_same_tag(self, tmp_path):
+        (tmp_path / "Dockerfile").write_text("FROM alpine\n")
+        (tmp_path / "script.sh").write_text("echo hello\n")
+        tag1 = DockerSandboxProvider._auto_tag(BuildSpec(context=str(tmp_path)))
+        tag2 = DockerSandboxProvider._auto_tag(BuildSpec(context=str(tmp_path)))
+        assert tag1 == tag2
+        assert tag1.startswith("terrarium-built:")
+
+    def test_different_content_yields_different_tag(self, tmp_path):
+        (tmp_path / "Dockerfile").write_text("FROM alpine\n")
+        tag1 = DockerSandboxProvider._auto_tag(BuildSpec(context=str(tmp_path)))
+        (tmp_path / "Dockerfile").write_text("FROM debian\n")
+        tag2 = DockerSandboxProvider._auto_tag(BuildSpec(context=str(tmp_path)))
+        assert tag1 != tag2
