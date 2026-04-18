@@ -1,4 +1,12 @@
-from terrarium.environment.sandbox import ExecResult, SandboxSpec, Sandbox, SandboxProvider
+import pytest
+
+from terrarium.environment.sandbox import (
+    BuildSpec,
+    ExecResult,
+    Sandbox,
+    SandboxProvider,
+    SandboxSpec,
+)
 
 
 def test_exec_result_fields():
@@ -11,6 +19,7 @@ def test_exec_result_fields():
 def test_sandbox_spec_defaults():
     spec = SandboxSpec(image="postgres:16")
     assert spec.image == "postgres:16"
+    assert spec.build is None
     assert spec.ports == []
     assert spec.env == {}
     assert spec.volumes == {}
@@ -31,13 +40,39 @@ def test_sandbox_spec_full():
     assert spec.command == ["postgres", "-c", "max_connections=100"]
 
 
+def test_sandbox_spec_with_build_only():
+    spec = SandboxSpec(build=BuildSpec(context="/path/to/ctx"))
+    assert spec.image is None
+    assert spec.build.context == "/path/to/ctx"
+
+
+def test_sandbox_spec_with_image_and_build():
+    spec = SandboxSpec(image="my-name:1", build=BuildSpec(context="/ctx"))
+    assert spec.image == "my-name:1"
+    assert spec.build.context == "/ctx"
+
+
+def test_sandbox_spec_rejects_neither():
+    with pytest.raises(ValueError, match="needs 'image' or 'build'"):
+        SandboxSpec()
+
+
+def test_build_spec_defaults():
+    b = BuildSpec(context="/ctx")
+    assert b.context == "/ctx"
+    assert b.dockerfile == "Dockerfile"
+
+
+def test_build_spec_custom_dockerfile():
+    b = BuildSpec(context="/ctx", dockerfile="custom.Dockerfile")
+    assert b.dockerfile == "custom.Dockerfile"
+
+
 def test_sandbox_is_abstract():
-    import pytest
     with pytest.raises(TypeError, match="abstract"):
         Sandbox()
 
 
 def test_sandbox_provider_is_abstract():
-    import pytest
     with pytest.raises(TypeError, match="abstract"):
         SandboxProvider()
