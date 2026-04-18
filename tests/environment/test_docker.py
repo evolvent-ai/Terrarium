@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import docker.errors
 
 from terrarium.environment.exceptions import ProviderError
-from terrarium.environment.providers.docker import DockerSandbox, DockerSandboxProvider
+from terrarium.environment.providers.docker import DockerSandbox, DockerSandboxProvider, _auto_tag
 from terrarium.environment.sandbox import BuildSpec, SandboxSpec
 
 
@@ -143,14 +143,14 @@ class TestAutoTag:
     def test_same_context_yields_same_tag(self, tmp_path):
         (tmp_path / "Dockerfile").write_text("FROM alpine\n")
         (tmp_path / "script.sh").write_text("echo hello\n")
-        tag1 = DockerSandboxProvider._auto_tag(BuildSpec(context=str(tmp_path)))
-        tag2 = DockerSandboxProvider._auto_tag(BuildSpec(context=str(tmp_path)))
+        tag1 = _auto_tag(BuildSpec(context=str(tmp_path)))
+        tag2 = _auto_tag(BuildSpec(context=str(tmp_path)))
         assert tag1 == tag2
         assert tag1.startswith("terrarium-built:")
 
     def test_different_content_yields_different_tag(self, tmp_path):
         (tmp_path / "Dockerfile").write_text("FROM alpine\n")
-        tag1 = DockerSandboxProvider._auto_tag(BuildSpec(context=str(tmp_path)))
+        tag1 = _auto_tag(BuildSpec(context=str(tmp_path)))
         (tmp_path / "Dockerfile").write_text("FROM debian\n")
-        tag2 = DockerSandboxProvider._auto_tag(BuildSpec(context=str(tmp_path)))
+        tag2 = _auto_tag(BuildSpec(context=str(tmp_path)))
         assert tag1 != tag2

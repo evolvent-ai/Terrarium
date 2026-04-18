@@ -191,7 +191,7 @@ class DockerSandboxProvider(SandboxProvider):
         return sandbox
 
     def _ensure_built(self, build: BuildSpec, tag: str | None) -> str:
-        tag = tag or self._auto_tag(build)
+        tag = tag or _auto_tag(build)
         try:
             self._client.images.get(tag)
             logger.debug("Build cache hit: {}", tag)
@@ -211,21 +211,6 @@ class DockerSandboxProvider(SandboxProvider):
             raise ProviderError(f"Failed to build image from {build.context}: {e}") from e
         return tag
 
-    @staticmethod
-    def _auto_tag(build: BuildSpec) -> str:
-        """Deterministic tag derived from a hash of the build context."""
-        ctx = Path(build.context)
-        h = hashlib.sha256()
-        h.update(build.dockerfile.encode())
-        h.update(b"\0")
-        for f in sorted(ctx.rglob("*")):
-            if not f.is_file():
-                continue
-            h.update(f.relative_to(ctx).as_posix().encode())
-            h.update(b"\0")
-            h.update(f.read_bytes())
-        return f"terrarium-built:{h.hexdigest()[:16]}"
-
     def teardown(self) -> None:
         for sandbox in reversed(self._sandboxes):
             try:
@@ -241,3 +226,18 @@ class DockerSandboxProvider(SandboxProvider):
             except Exception as e:
                 logger.warning("Error removing network: {}", e)
             self._network = None
+
+
+def _auto_tag(build: BuildSpec) -> str:
+    """Deterministic tag derived from a hash of the build context."""
+    ctx = Path(build.context)
+    h = hashlib.sha256()
+    h.update(build.dockerfile.encode())
+    h.update(b"\0")
+    for f in sorted(ctx.rglob("*")):
+        if not f.is_file():
+            continue
+        h.update(f.relative_to(ctx).as_posix().encode())
+        h.update(b"\0")
+        h.update(f.read_bytes())
+    return f"terrarium-built:{h.hexdigest()[:16]}"
