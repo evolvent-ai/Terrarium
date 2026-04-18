@@ -16,7 +16,7 @@ class ExecResult(BaseModel):
 
 
 class BuildSpec(BaseModel):
-    """How to build a sandbox image from a Dockerfile."""
+    """Build parameters for a sandbox image."""
 
     context: str
     dockerfile: str = "Dockerfile"

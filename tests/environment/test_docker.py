@@ -44,6 +44,15 @@ class TestDockerSandbox:
 
 
 class TestDockerSandboxProvider:
+    def _make_client(self, image_cached: bool = False):
+        client = MagicMock()
+        if not image_cached:
+            client.images.get.side_effect = docker.errors.ImageNotFound("")
+        container = MagicMock()
+        container.ports = {}
+        client.containers.run.return_value = container
+        return client
+
     @patch("terrarium.environment.providers.docker.docker.from_env")
     def test_setup_creates_network(self, mock_from_env):
         client = MagicMock()
@@ -73,34 +82,24 @@ class TestDockerSandboxProvider:
     @patch("terrarium.environment.providers.docker.docker.from_env")
     def test_create_with_build_builds_and_runs(self, mock_from_env, tmp_path):
         (tmp_path / "Dockerfile").write_text("FROM alpine\n")
-        client = MagicMock()
+        client = self._make_client()
         mock_from_env.return_value = client
-        client.images.get.side_effect = docker.errors.ImageNotFound("not built yet")
-        container = MagicMock()
-        container.ports = {}
-        client.containers.run.return_value = container
 
         provider = DockerSandboxProvider()
         provider.setup()
         provider.create(SandboxSpec(build=BuildSpec(context=str(tmp_path))))
 
-        client.images.build.assert_called_once()
         build_kwargs = client.images.build.call_args.kwargs
         assert build_kwargs["path"] == str(tmp_path)
         assert build_kwargs["dockerfile"] == "Dockerfile"
         assert build_kwargs["tag"].startswith("terrarium-built:")
-
-        run_image = client.containers.run.call_args.kwargs["image"]
-        assert run_image == build_kwargs["tag"]
+        assert client.containers.run.call_args.kwargs["image"] == build_kwargs["tag"]
 
     @patch("terrarium.environment.providers.docker.docker.from_env")
     def test_create_with_build_uses_cache_when_tag_exists(self, mock_from_env, tmp_path):
         (tmp_path / "Dockerfile").write_text("FROM alpine\n")
-        client = MagicMock()
+        client = self._make_client(image_cached=True)
         mock_from_env.return_value = client
-        container = MagicMock()
-        container.ports = {}
-        client.containers.run.return_value = container
 
         provider = DockerSandboxProvider()
         provider.setup()
@@ -111,12 +110,8 @@ class TestDockerSandboxProvider:
     @patch("terrarium.environment.providers.docker.docker.from_env")
     def test_create_with_build_honors_caller_tag(self, mock_from_env, tmp_path):
         (tmp_path / "Dockerfile").write_text("FROM alpine\n")
-        client = MagicMock()
+        client = self._make_client()
         mock_from_env.return_value = client
-        client.images.get.side_effect = docker.errors.ImageNotFound("")
-        container = MagicMock()
-        container.ports = {}
-        client.containers.run.return_value = container
 
         provider = DockerSandboxProvider()
         provider.setup()
@@ -128,9 +123,8 @@ class TestDockerSandboxProvider:
     @patch("terrarium.environment.providers.docker.docker.from_env")
     def test_create_with_build_propagates_build_errors(self, mock_from_env, tmp_path):
         (tmp_path / "Dockerfile").write_text("FROM alpine\n")
-        client = MagicMock()
+        client = self._make_client()
         mock_from_env.return_value = client
-        client.images.get.side_effect = docker.errors.ImageNotFound("")
         client.images.build.side_effect = docker.errors.BuildError("bad syntax", build_log=[])
 
         provider = DockerSandboxProvider()

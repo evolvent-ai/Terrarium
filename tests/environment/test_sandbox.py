@@ -69,12 +69,10 @@ def test_build_spec_custom_dockerfile():
 
 
 def test_sandbox_is_abstract():
-    import pytest
     with pytest.raises(TypeError, match="abstract"):
         Sandbox()
 
 
 def test_sandbox_provider_is_abstract():
-    import pytest
     with pytest.raises(TypeError, match="abstract"):
         SandboxProvider()
