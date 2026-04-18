@@ -57,20 +57,19 @@ def params():
 
         cfg = tomllib.loads((td / "task.toml").read_text())
         env_cfg = cfg.get("environment", {})
-        image = env_cfg.get("docker_image")
-        if not image:
-            # v0 only supports pre-built images; Dockerfile builds not handled.
+
+        workspace: dict = {"env": env_cfg.get("env", {})}
+        if image := env_cfg.get("docker_image"):
+            workspace["image"] = {"name": image}
+        elif (td / "environment" / "Dockerfile").exists():
+            workspace["image"] = {"build": {"context": str(td / "environment")}}
+        else:
             continue
 
         yield {
             "name": td.name,
             "params": {"task_dir": str(td)},
-            "capabilities_config": {
-                "workspace": {
-                    "image": image,
-                    "env": env_cfg.get("env", {}),
-                },
-            },
+            "capabilities_config": {"workspace": workspace},
         }
 
 
