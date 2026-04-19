@@ -15,7 +15,7 @@ import docker.errors
 from loguru import logger
 
 from terrarium.environment.exceptions import ProviderError, SandboxError
-from terrarium.environment.sandbox import BuildSpec, ExecResult, Sandbox, SandboxSpec, SandboxProvider
+from terrarium.environment.sandbox import BuildSpec, ExecResult, ImageSpec, Sandbox, SandboxSpec, SandboxProvider
 
 
 class DockerSandbox(Sandbox):
@@ -149,9 +149,7 @@ class DockerSandboxProvider(SandboxProvider):
             self._network = self._client.networks.create(network_name, driver="bridge")
 
     def create(self, spec: SandboxSpec) -> Sandbox:
-        image_name = (
-            self._ensure_built(spec.build, spec.image) if spec.build else spec.image
-        )
+        image_name = self._resolve_image(spec.image)
         port_bindings = {f"{p}/tcp": None for p in spec.ports}
         environment = spec.env or {}
         volumes = spec.volumes or {}
@@ -190,8 +188,10 @@ class DockerSandboxProvider(SandboxProvider):
         self._sandboxes.append(sandbox)
         return sandbox
 
-    def _ensure_built(self, build: BuildSpec, tag: str | None) -> str:
-        tag = tag or self._derive_tag(build)
+    def _resolve_image(self, image: ImageSpec) -> str:
+        if image.build is None:
+            return image.name
+        tag = image.name or self._derive_tag(image.build)
         try:
             self._client.images.get(tag)
             logger.debug("Build cache hit: {}", tag)
@@ -199,16 +199,16 @@ class DockerSandboxProvider(SandboxProvider):
         except docker.errors.ImageNotFound:
             pass
 
-        logger.info("Building image: tag={} context={}", tag, build.context)
+        logger.info("Building image: tag={} context={}", tag, image.build.context)
         try:
             self._client.images.build(
-                path=build.context,
-                dockerfile=build.dockerfile,
+                path=image.build.context,
+                dockerfile=image.build.dockerfile,
                 tag=tag,
                 rm=True,
             )
         except docker.errors.DockerException as e:
-            raise ProviderError(f"Failed to build image from {build.context}: {e}") from e
+            raise ProviderError(f"Failed to build image from {image.build.context}: {e}") from e
         return tag
 
     @staticmethod

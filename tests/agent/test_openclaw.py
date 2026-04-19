@@ -322,4 +322,4 @@ class TestInstallSkill:
 
 def test_name_and_workspace_config():
     assert OpenClawAgent.name() == "openclaw"
-    assert OpenClawAgent.workspace_config() == {"image": "terrarium/openclaw:latest"}
+    assert OpenClawAgent.workspace_config() == {"image": {"name": "terrarium/openclaw:latest"}}

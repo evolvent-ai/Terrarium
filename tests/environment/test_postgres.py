@@ -28,18 +28,18 @@ class TestPostgresCapabilityUnit:
 
     def test_sandbox_spec_defaults(self):
         spec = PostgresCapability.sandbox_spec()
-        assert spec.image == "postgres:16"
+        assert spec.image.name == "postgres:16"
         assert 5432 in spec.ports
         assert spec.env["POSTGRES_PASSWORD"] == "terrarium"
         assert spec.env["POSTGRES_DB"] == "main"
 
     def test_sandbox_spec_custom_config(self):
         spec = PostgresCapability.sandbox_spec({
-            "image": "postgres:15",
+            "image": {"name": "postgres:15"},
             "db_name": "mydb",
             "password": "secret",
         })
-        assert spec.image == "postgres:15"
+        assert spec.image.name == "postgres:15"
         assert spec.env["POSTGRES_PASSWORD"] == "secret"
         assert spec.env["POSTGRES_DB"] == "mydb"
 

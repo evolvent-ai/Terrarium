@@ -5,7 +5,7 @@ import docker.errors
 
 from terrarium.environment.exceptions import ProviderError
 from terrarium.environment.providers.docker import DockerSandbox, DockerSandboxProvider
-from terrarium.environment.sandbox import BuildSpec, SandboxSpec
+from terrarium.environment.sandbox import BuildSpec, ImageSpec, SandboxSpec
 
 
 class TestDockerSandbox:
@@ -72,7 +72,7 @@ class TestDockerSandboxProvider:
         container.exec_run.return_value = (0, b"")
         container.ports = {}
         client.containers.run.return_value = container
-        spec = SandboxSpec(image="test:latest")
+        spec = SandboxSpec(image=ImageSpec(name="test:latest"))
         provider.create(spec)
 
         provider.teardown()
@@ -87,7 +87,7 @@ class TestDockerSandboxProvider:
 
         provider = DockerSandboxProvider()
         provider.setup()
-        provider.create(SandboxSpec(build=BuildSpec(context=str(tmp_path))))
+        provider.create(SandboxSpec(image=ImageSpec(build=BuildSpec(context=str(tmp_path)))))
 
         build_kwargs = client.images.build.call_args.kwargs
         assert build_kwargs["path"] == str(tmp_path)
@@ -103,7 +103,7 @@ class TestDockerSandboxProvider:
 
         provider = DockerSandboxProvider()
         provider.setup()
-        provider.create(SandboxSpec(build=BuildSpec(context=str(tmp_path))))
+        provider.create(SandboxSpec(image=ImageSpec(build=BuildSpec(context=str(tmp_path)))))
 
         client.images.build.assert_not_called()
 
@@ -115,7 +115,7 @@ class TestDockerSandboxProvider:
 
         provider = DockerSandboxProvider()
         provider.setup()
-        provider.create(SandboxSpec(image="custom:v1", build=BuildSpec(context=str(tmp_path))))
+        provider.create(SandboxSpec(image=ImageSpec(name="custom:v1", build=BuildSpec(context=str(tmp_path)))))
 
         assert client.images.build.call_args.kwargs["tag"] == "custom:v1"
         assert client.containers.run.call_args.kwargs["image"] == "custom:v1"
@@ -130,7 +130,7 @@ class TestDockerSandboxProvider:
         provider = DockerSandboxProvider()
         provider.setup()
         with pytest.raises(ProviderError, match="Failed to build"):
-            provider.create(SandboxSpec(build=BuildSpec(context=str(tmp_path))))
+            provider.create(SandboxSpec(image=ImageSpec(build=BuildSpec(context=str(tmp_path)))))
 
 
 class TestDeriveTag:

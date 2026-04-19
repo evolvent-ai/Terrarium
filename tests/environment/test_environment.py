@@ -88,7 +88,7 @@ def test_workspace_starts_after_other_capabilities(mock_psycopg2):
     env = ComposableEnvironment(
         ["workspace", "postgres"],
         provider=provider,
-        config={"workspace": {"image": "ubuntu:24.04"}},
+        config={"workspace": {"image": {"name": "ubuntu:24.04"}}},
     )
     env.start()
     assert start_order[-1].startswith("workspace"), f"workspace should start last, got {start_order}"
@@ -127,7 +127,7 @@ def test_secrets_env_injected_into_workspace(mock_psycopg2):
             provider=provider,
             config={
                 "notion": {"auth_token": "test"},
-                "workspace": {"image": "ubuntu:24.04"},
+                "workspace": {"image": {"name": "ubuntu:24.04"}},
             },
         )
         env.start()
