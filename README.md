@@ -21,6 +21,10 @@ https://github.com/user-attachments/assets/eeaf0af8-4915-4482-ae2f-917870f09f11
 
 [[video link]](https://oss.evolvent.co/articles/terrarium-1.mp4)
 
+## News
+
+- [2026-04-19] — Terrarium is now compatible with the [Harbor](https://www.harborframework.com/) task format via the bundled adapter at [`benchmarks/harbor-adapter/`](benchmarks/harbor-adapter/).
+
 ## Motivation
 
 The way we evaluate and train agents has evolved through three phases:
