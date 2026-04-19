@@ -160,6 +160,4 @@ def _register_skills(workspace, agent, skills_dir: str) -> None:
         return
     src = shlex.quote(skills_dir)
     dst = shlex.quote(dest)
-    workspace.shell.exec(
-        f"mkdir -p {dst} && cp -r {src}/* {dst}/ 2>/dev/null || true"
-    )
+    workspace.shell.exec(f"mkdir -p {dst} && cp -r {src}/* {dst}/")
