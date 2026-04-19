@@ -99,19 +99,19 @@ class TestEmailCapabilityUnit:
 
     def test_sandbox_spec_defaults(self):
         spec = EmailCapability.sandbox_spec()
-        assert spec.image == "greenmail/standalone:2.1.8"
+        assert spec.image.name == "greenmail/standalone:2.1.8"
         assert 3025 in spec.ports
         assert 3143 in spec.ports
         assert 3110 in spec.ports
 
     def test_sandbox_spec_custom_config(self):
         spec = EmailCapability.sandbox_spec({
-            "image": "greenmail/standalone:2.2.0",
+            "image": {"name": "greenmail/standalone:2.2.0"},
             "smtp_port": 4025,
             "imap_port": 4143,
             "pop3_port": 4110,
         })
-        assert spec.image == "greenmail/standalone:2.2.0"
+        assert spec.image.name == "greenmail/standalone:2.2.0"
         assert 4025 in spec.ports
         assert 4143 in spec.ports
         assert 4110 in spec.ports

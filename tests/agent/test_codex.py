@@ -89,7 +89,7 @@ class TestCodexAgentBasics:
         assert CodexAgent.name() == "codex"
 
     def test_workspace_config(self):
-        assert CodexAgent.workspace_config() == {"image": "terrarium/codex:latest"}
+        assert CodexAgent.workspace_config() == {"image": {"name": "terrarium/codex:latest"}}
 
     def test_version_before_setup(self):
         assert CodexAgent().version() is None

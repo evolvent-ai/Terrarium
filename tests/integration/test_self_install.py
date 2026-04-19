@@ -23,7 +23,7 @@ def _run_setup(agent, cli: str) -> None:
     """
     env = ComposableEnvironment(
         capabilities=["workspace"],
-        config={"workspace": {"image": "ubuntu:24.04"}},
+        config={"workspace": {"image": {"name": "ubuntu:24.04"}}},
     )
     env.start()
     try:

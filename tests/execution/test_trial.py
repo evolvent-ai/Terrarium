@@ -137,20 +137,20 @@ async def test_agent_workspace_config_merged(tmp_path):
     task_dir = _write_task(
         tmp_path / "t",
         "capabilities=['workspace'], "
-        "capabilities_config={'workspace': {'image': 'task-img', 'command': 'sleep 1'}}",
+        "capabilities_config={'workspace': {'image': {'name': 'task-img'}, 'command': 'sleep 1'}}",
     )
 
     from tests.agent.mock import MockAgent
 
     mock_rt = _make_mock_rt()
-    with patch.object(MockAgent, "workspace_config", classmethod(lambda cls: {"image": "agent-img"})), \
+    with patch.object(MockAgent, "workspace_config", classmethod(lambda cls: {"image": {"name": "agent-img"}})), \
          patch("terrarium.execution.trial.ComposableEnvironment", return_value=mock_rt) as env_ctor:
         await Trial(_make_config(task_dir=task_dir)).run()
 
     _, kwargs = env_ctor.call_args
     assert kwargs["capabilities"] == ["workspace"]
     # Task's image wins; task's 'command' kept; agent's image becomes a no-op.
-    assert kwargs["config"]["workspace"] == {"image": "task-img", "command": "sleep 1"}
+    assert kwargs["config"]["workspace"] == {"image": {"name": "task-img"}, "command": "sleep 1"}
 
 
 @pytest.mark.asyncio
@@ -161,12 +161,12 @@ async def test_agent_workspace_image_is_fallback(tmp_path):
     from tests.agent.mock import MockAgent
 
     mock_rt = _make_mock_rt()
-    with patch.object(MockAgent, "workspace_config", classmethod(lambda cls: {"image": "agent-img"})), \
+    with patch.object(MockAgent, "workspace_config", classmethod(lambda cls: {"image": {"name": "agent-img"}})), \
          patch("terrarium.execution.trial.ComposableEnvironment", return_value=mock_rt) as env_ctor:
         await Trial(_make_config(task_dir=task_dir)).run()
 
     _, kwargs = env_ctor.call_args
-    assert kwargs["config"]["workspace"] == {"image": "agent-img"}
+    assert kwargs["config"]["workspace"] == {"image": {"name": "agent-img"}}
 
 
 @pytest.mark.asyncio

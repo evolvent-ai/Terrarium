@@ -23,12 +23,18 @@ class TestWorkspaceCapabilityUnit:
 
     def test_sandbox_spec_defaults(self):
         spec = WorkspaceCapability.sandbox_spec()
-        assert spec.image == "ubuntu:24.04"
+        assert spec.image.name == "ubuntu:24.04"
         assert spec.command == ["tail", "-f", "/dev/null"]
 
     def test_sandbox_spec_custom_image(self):
-        spec = WorkspaceCapability.sandbox_spec({"image": "python:3.12-slim"})
-        assert spec.image == "python:3.12-slim"
+        spec = WorkspaceCapability.sandbox_spec({"image": {"name": "python:3.12-slim"}})
+        assert spec.image.name == "python:3.12-slim"
+
+    def test_sandbox_spec_build(self, tmp_path):
+        (tmp_path / "Dockerfile").write_text("FROM alpine\n")
+        spec = WorkspaceCapability.sandbox_spec({"image": {"build": {"context": str(tmp_path)}}})
+        assert spec.image.name is None
+        assert spec.image.build.context == str(tmp_path)
 
     def test_sandbox_spec_custom_command(self):
         spec = WorkspaceCapability.sandbox_spec({"command": ["tail", "-f", "/dev/null"]})
@@ -45,8 +51,15 @@ class TestWorkspaceCapabilityUnit:
 
     def test_init_custom_image(self):
         sandbox = self._make_sandbox()
-        cap = WorkspaceCapability(config={"image": "alpine:3.19"}, sandbox=sandbox)
+        cap = WorkspaceCapability(config={"image": {"name": "alpine:3.19"}}, sandbox=sandbox)
         assert cap._image == "alpine:3.19"
+
+    def test_init_build_only_image_name_is_none(self):
+        sandbox = self._make_sandbox()
+        cap = WorkspaceCapability(
+            config={"image": {"build": {"context": "/ctx"}}}, sandbox=sandbox
+        )
+        assert cap._image is None
 
     def test_has_fs_and_shell(self):
         cap, sandbox = self._make_cap()
@@ -95,7 +108,7 @@ class TestWorkspaceCapabilityUnit:
 
     def test_connection_info_custom_image(self):
         sandbox = self._make_sandbox()
-        cap = WorkspaceCapability(config={"image": "node:20"}, sandbox=sandbox)
+        cap = WorkspaceCapability(config={"image": {"name": "node:20"}}, sandbox=sandbox)
         assert cap.connection_info["image"] == "node:20"
 
     # -------------------------------------------------------------------
