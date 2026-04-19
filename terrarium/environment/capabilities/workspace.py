@@ -20,9 +20,11 @@ class WorkspaceCapability(BaseCapability):
     manage files. User picks the image via config.
 
     Config options:
-        image:   ImageSpec dict (default: {"name": "ubuntu:24.04"})
-        command: Override container entrypoint (default: sleep infinity)
-        env:     Environment variables for the container (default: {})
+        image:     ImageSpec dict (default: {"name": "ubuntu:24.04"})
+        command:   Override container entrypoint (default: ["tail", "-f", "/dev/null"])
+        env:       Environment variables for the container (default: {})
+        resources: Container resource limits dict (default: {})
+        workdir:   Default working directory inside the container (default: None)
     """
 
     def __init__(self, config=None, sandbox=None):
@@ -36,6 +38,8 @@ class WorkspaceCapability(BaseCapability):
             image=config.get("image") or {"name": DEFAULT_IMAGE},
             command=config.get("command", ["tail", "-f", "/dev/null"]),
             env=config.get("env", {}),
+            resources=config.get("resources", {}),
+            workdir=config.get("workdir", None),
         )
 
     def wait_ready(self, timeout: float = 30.0) -> None:

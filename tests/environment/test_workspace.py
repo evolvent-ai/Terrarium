@@ -44,6 +44,28 @@ class TestWorkspaceCapabilityUnit:
         spec = WorkspaceCapability.sandbox_spec({"env": {"FOO": "1", "BAR": "x"}})
         assert spec.env == {"FOO": "1", "BAR": "x"}
 
+    def test_sandbox_spec_resources_default_empty(self):
+        spec = WorkspaceCapability.sandbox_spec()
+        assert spec.resources.cpus is None
+        assert spec.resources.memory is None
+        assert spec.resources.storage is None
+
+    def test_sandbox_spec_forwards_resources(self):
+        spec = WorkspaceCapability.sandbox_spec({
+            "resources": {"cpus": 2, "memory": "4G", "storage": "20G"},
+        })
+        assert spec.resources.cpus == 2
+        assert spec.resources.memory == "4G"
+        assert spec.resources.storage == "20G"
+
+    def test_sandbox_spec_workdir_default_none(self):
+        spec = WorkspaceCapability.sandbox_spec()
+        assert spec.workdir is None
+
+    def test_sandbox_spec_forwards_workdir(self):
+        spec = WorkspaceCapability.sandbox_spec({"workdir": "/srv"})
+        assert spec.workdir == "/srv"
+
     # -------------------------------------------------------------------
     # init
     # -------------------------------------------------------------------

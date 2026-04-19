@@ -50,3 +50,23 @@ class TestWorkspaceIntegration:
         with ComposableEnvironment(["workspace"]) as env:
             with pytest.raises(SandboxError, match="timed out"):
                 env.workspace.shell.exec("sleep 100", timeout=1)
+
+    def test_workdir(self):
+        with ComposableEnvironment(
+            ["workspace"],
+            config={"workspace": {"workdir": "/tmp"}},
+        ) as env:
+            result = env.workspace.shell.exec("pwd")
+            assert result.exit_code == 0
+            assert result.stdout.strip() == "/tmp"
+
+    def test_resource_limits_start_container(self):
+        # Smoke test: container starts and is usable when cpus/memory limits
+        # are set. Actual kernel enforcement is Docker's job, not ours to verify.
+        with ComposableEnvironment(
+            ["workspace"],
+            config={"workspace": {"resources": {"cpus": 1.0, "memory": "512M"}}},
+        ) as env:
+            result = env.workspace.shell.exec("echo ok")
+            assert result.exit_code == 0
+            assert "ok" in result.stdout

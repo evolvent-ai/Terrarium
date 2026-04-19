@@ -4,6 +4,7 @@ from terrarium.environment.sandbox import (
     BuildSpec,
     ExecResult,
     ImageSpec,
+    ResourceLimits,
     Sandbox,
     SandboxProvider,
     SandboxSpec,
@@ -48,6 +49,8 @@ def test_sandbox_spec_defaults():
     assert spec.env == {}
     assert spec.volumes == {}
     assert spec.command is None
+    assert spec.resources == ResourceLimits()
+    assert spec.workdir is None
 
 
 def test_sandbox_spec_full():
@@ -73,6 +76,43 @@ def test_sandbox_spec_accepts_dict():
 def test_sandbox_spec_requires_image():
     with pytest.raises(ValueError):
         SandboxSpec()
+
+
+def test_resource_limits_defaults():
+    r = ResourceLimits()
+    assert r.cpus is None
+    assert r.memory is None
+    assert r.storage is None
+
+
+def test_resource_limits_full():
+    r = ResourceLimits(cpus=1.5, memory="2G", storage="10G")
+    assert r.cpus == 1.5
+    assert r.memory == "2G"
+    assert r.storage == "10G"
+
+
+def test_resource_limits_partial():
+    r = ResourceLimits(memory="512M")
+    assert r.cpus is None
+    assert r.memory == "512M"
+    assert r.storage is None
+
+
+def test_sandbox_spec_accepts_resources_dict():
+    spec = SandboxSpec(
+        image=ImageSpec(name="postgres:16"),
+        resources={"cpus": 2, "memory": "4G"},
+    )
+    assert isinstance(spec.resources, ResourceLimits)
+    assert spec.resources.cpus == 2
+    assert spec.resources.memory == "4G"
+    assert spec.resources.storage is None
+
+
+def test_sandbox_spec_with_workdir():
+    spec = SandboxSpec(image=ImageSpec(name="postgres:16"), workdir="/app")
+    assert spec.workdir == "/app"
 
 
 def test_build_spec_defaults():

@@ -35,6 +35,14 @@ class ImageSpec(BaseModel):
         return self
 
 
+class ResourceLimits(BaseModel):
+    """Sandbox-level resource limits."""
+
+    cpus: float | None = None
+    memory: str | None = None
+    storage: str | None = None
+
+
 class SandboxSpec(BaseModel):
     """Configuration needed to run a sandbox."""
 
@@ -44,6 +52,8 @@ class SandboxSpec(BaseModel):
     volumes: dict[str, str] = Field(default_factory=dict)
     command: str | list[str] | None = None
     name: str | None = None
+    resources: ResourceLimits = Field(default_factory=ResourceLimits)
+    workdir: str | None = None
 
 
 class Sandbox(ABC):
