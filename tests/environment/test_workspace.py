@@ -40,6 +40,10 @@ class TestWorkspaceCapabilityUnit:
         spec = WorkspaceCapability.sandbox_spec({"command": ["tail", "-f", "/dev/null"]})
         assert spec.command == ["tail", "-f", "/dev/null"]
 
+    def test_sandbox_spec_forwards_env(self):
+        spec = WorkspaceCapability.sandbox_spec({"env": {"FOO": "1", "BAR": "x"}})
+        assert spec.env == {"FOO": "1", "BAR": "x"}
+
     # -------------------------------------------------------------------
     # init
     # -------------------------------------------------------------------
