@@ -128,3 +128,7 @@ class TestInstallSkill:
 
         dests = [call[1] for call in agent._workspace.fs.upload_calls]
         assert dests == [f"{SKILLS_DIR}/a", f"{SKILLS_DIR}/b"]
+
+    def test_skills_dir_property(self):
+        """skills_dir property exposes the in-container skills path."""
+        assert _make_agent().skills_dir == SKILLS_DIR

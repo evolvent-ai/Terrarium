@@ -53,6 +53,11 @@ class BaseAgent(ABC):
         """Install a skill into the agent. Raises NotImplementedError by default."""
         raise NotImplementedError(f"Agent '{self.name()}' does not support skills")
 
+    @property
+    def skills_dir(self) -> str | None:
+        """Container path where this agent picks up skills. None if unsupported."""
+        return None
+
     @abstractmethod
     def act(self, instruction: str) -> ActResult:
         """Execute an instruction. Returns ActResult and accumulates internally."""

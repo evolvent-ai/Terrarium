@@ -224,6 +224,10 @@ class TestInstallSkill:
         with pytest.raises(FileNotFoundError, match="not a directory"):
             agent.install_skill(tmp_path / "SKILL.md")
 
+    def test_skills_dir_property(self):
+        """skills_dir property exposes the in-container skills path."""
+        assert CodexAgent().skills_dir == SKILLS_DIR
+
 
 class TestAct:
     def test_reads_session(self):
