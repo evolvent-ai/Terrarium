@@ -319,7 +319,9 @@ class TestInstallSkill:
         with pytest.raises(FileNotFoundError, match="not a directory"):
             agent.install_skill(tmp_path / "SKILL.md")
 
-    def test_skills_dir_property(self, models_config):
+
+class TestSkillsDir:
+    def test_returns_in_container_skills_path(self, models_config):
         """skills_dir property exposes the in-container skills path."""
         agent, _ = _make_agent(models_config)
         assert agent.skills_dir == SKILLS_DIR
