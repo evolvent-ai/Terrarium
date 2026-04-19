@@ -320,6 +320,13 @@ class TestInstallSkill:
             agent.install_skill(tmp_path / "SKILL.md")
 
 
+class TestSkillsDir:
+    def test_returns_in_container_skills_path(self, models_config):
+        """skills_dir property exposes the in-container skills path."""
+        agent, _ = _make_agent(models_config)
+        assert agent.skills_dir == SKILLS_DIR
+
+
 def test_name_and_workspace_config():
     assert OpenClawAgent.name() == "openclaw"
     assert OpenClawAgent.workspace_config() == {"image": {"name": "terrarium/openclaw:latest"}}
