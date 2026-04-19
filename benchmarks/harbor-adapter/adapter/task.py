@@ -39,26 +39,6 @@ def harbor_task(env, agent, *, task_dir: str):
     return CheckerResults(checks=[], score=_read_reward(env.workspace))
 
 
-def _register_skills(workspace, agent, skills_dir: str) -> None:
-    """Copy Harbor-style skills from a container path into the agent's skills config dir.
-
-    Mirrors Harbor's per-agent `cp -r {skills_dir}/* {dest}/` pattern. If the agent
-    does not expose a `skills_dir`, log and skip.
-    """
-    dest = agent.skills_dir
-    if dest is None:
-        logger.warning(
-            "[harbor] agent {!r} does not support skills; ignoring skills_dir={}",
-            agent.name(), skills_dir,
-        )
-        return
-    src = shlex.quote(skills_dir)
-    dst = shlex.quote(dest)
-    workspace.shell.exec(
-        f"mkdir -p {dst} && cp -r {src}/* {dst}/ 2>/dev/null || true"
-    )
-
-
 @harbor_task.parameterize
 def params():
     dataset_dir = os.environ.get("HARBOR_DATASET_DIR")
@@ -168,3 +148,18 @@ def _read_reward(workspace) -> float:
             f"{sorted(rewards.keys())}"
         )
     return float(next(iter(rewards.values())))
+
+
+def _register_skills(workspace, agent, skills_dir: str) -> None:
+    dest = agent.skills_dir
+    if dest is None:
+        logger.warning(
+            "[harbor] agent {!r} does not support skills; ignoring skills_dir={}",
+            agent.name(), skills_dir,
+        )
+        return
+    src = shlex.quote(skills_dir)
+    dst = shlex.quote(dest)
+    workspace.shell.exec(
+        f"mkdir -p {dst} && cp -r {src}/* {dst}/ 2>/dev/null || true"
+    )
