@@ -116,6 +116,10 @@ class ClaudeCodeAgent(BaseAgent):
         self._workspace.fs.upload(str(path), dest)
         logger.info("Installed skill: {} -> {}", skill_name, dest)
 
+    @property
+    def skills_dir(self) -> str:
+        return SKILLS_DIR
+
     def act(self, instruction: str) -> ActResult:
         command = self._build_command(instruction)
         logger.info("Claude Code act: instruction={}", instruction)
