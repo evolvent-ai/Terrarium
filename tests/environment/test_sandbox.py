@@ -3,6 +3,7 @@ import pytest
 from terrarium.environment.sandbox import (
     BuildSpec,
     ExecResult,
+    ImageSpec,
     Sandbox,
     SandboxProvider,
     SandboxSpec,
@@ -16,10 +17,33 @@ def test_exec_result_fields():
     assert r.stderr == ""
 
 
+def test_image_spec_name_only():
+    img = ImageSpec(name="postgres:16")
+    assert img.name == "postgres:16"
+    assert img.build is None
+
+
+def test_image_spec_build_only():
+    img = ImageSpec(build=BuildSpec(context="/ctx"))
+    assert img.name is None
+    assert img.build.context == "/ctx"
+
+
+def test_image_spec_name_and_build():
+    img = ImageSpec(name="custom:v1", build=BuildSpec(context="/ctx"))
+    assert img.name == "custom:v1"
+    assert img.build.context == "/ctx"
+
+
+def test_image_spec_rejects_neither():
+    with pytest.raises(ValueError, match="needs 'name' or 'build'"):
+        ImageSpec()
+
+
 def test_sandbox_spec_defaults():
-    spec = SandboxSpec(image="postgres:16")
-    assert spec.image == "postgres:16"
-    assert spec.build is None
+    spec = SandboxSpec(image=ImageSpec(name="postgres:16"))
+    assert spec.image.name == "postgres:16"
+    assert spec.image.build is None
     assert spec.ports == []
     assert spec.env == {}
     assert spec.volumes == {}
@@ -28,7 +52,7 @@ def test_sandbox_spec_defaults():
 
 def test_sandbox_spec_full():
     spec = SandboxSpec(
-        image="postgres:16",
+        image=ImageSpec(name="postgres:16"),
         ports=[5432],
         env={"POSTGRES_DB": "main"},
         volumes={"/tmp/data": "/data"},
@@ -40,20 +64,14 @@ def test_sandbox_spec_full():
     assert spec.command == ["postgres", "-c", "max_connections=100"]
 
 
-def test_sandbox_spec_with_build_only():
-    spec = SandboxSpec(build=BuildSpec(context="/path/to/ctx"))
-    assert spec.image is None
-    assert spec.build.context == "/path/to/ctx"
+def test_sandbox_spec_accepts_dict():
+    spec = SandboxSpec(image={"name": "alpine:3.19"})
+    assert isinstance(spec.image, ImageSpec)
+    assert spec.image.name == "alpine:3.19"
 
 
-def test_sandbox_spec_with_image_and_build():
-    spec = SandboxSpec(image="my-name:1", build=BuildSpec(context="/ctx"))
-    assert spec.image == "my-name:1"
-    assert spec.build.context == "/ctx"
-
-
-def test_sandbox_spec_rejects_neither():
-    with pytest.raises(ValueError, match="needs 'image' or 'build'"):
+def test_sandbox_spec_requires_image():
+    with pytest.raises(ValueError):
         SandboxSpec()
 
 

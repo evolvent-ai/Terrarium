@@ -36,7 +36,7 @@ class FakeSandbox(Sandbox):
 class FakeSandboxCapability(BaseCapability):
     @classmethod
     def sandbox_spec(cls, config=None) -> SandboxSpec:
-        return SandboxSpec(image="test:latest", ports=[8080])
+        return SandboxSpec(image={"name": "test:latest"}, ports=[8080])
 
     def wait_ready(self) -> None:
         pass
@@ -164,5 +164,5 @@ def test_sandbox_spec_default_returns_none():
 
 def test_sandbox_spec_override():
     spec = FakeSandboxCapability.sandbox_spec()
-    assert spec.image == "test:latest"
+    assert spec.image.name == "test:latest"
     assert spec.ports == [8080]

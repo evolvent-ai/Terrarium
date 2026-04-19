@@ -68,16 +68,16 @@ class TestCalendarCapabilityUnit:
 
     def test_sandbox_spec_defaults(self):
         spec = CalendarCapability.sandbox_spec()
-        assert spec.image == "tomsquest/docker-radicale:3.6.1.0"
+        assert spec.image.name == "tomsquest/docker-radicale:3.6.1.0"
         assert 5232 in spec.ports
         assert spec.env["RADICALE_CONFIG_AUTH_TYPE"] == "none"
 
     def test_sandbox_spec_custom_config(self):
         spec = CalendarCapability.sandbox_spec({
-            "image": "custom/radicale:latest",
+            "image": {"name": "custom/radicale:latest"},
             "port": 9232,
         })
-        assert spec.image == "custom/radicale:latest"
+        assert spec.image.name == "custom/radicale:latest"
         assert 9232 in spec.ports
 
     def test_init_defaults(self):

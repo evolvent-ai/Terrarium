@@ -33,7 +33,7 @@ class TestWorkspaceIntegration:
     def test_custom_image(self):
         with ComposableEnvironment(
             ["workspace"],
-            config={"workspace": {"image": "python:3.12-slim"}},
+            config={"workspace": {"image": {"name": "python:3.12-slim"}}},
         ) as env:
             result = env.workspace.shell.exec("python3 --version")
             assert result.exit_code == 0
