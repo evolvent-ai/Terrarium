@@ -22,6 +22,7 @@ class WorkspaceCapability(BaseCapability):
     Config options:
         image:   ImageSpec dict (default: {"name": "ubuntu:24.04"})
         command: Override container entrypoint (default: sleep infinity)
+        env:     Environment variables for the container (default: {})
     """
 
     def __init__(self, config=None, sandbox=None):
@@ -34,6 +35,7 @@ class WorkspaceCapability(BaseCapability):
         return SandboxSpec(
             image=config.get("image") or {"name": DEFAULT_IMAGE},
             command=config.get("command", ["tail", "-f", "/dev/null"]),
+            env=config.get("env", {}),
         )
 
     def wait_ready(self, timeout: float = 30.0) -> None:
