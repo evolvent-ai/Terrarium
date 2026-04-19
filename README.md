@@ -1,23 +1,23 @@
-<h1 align="center">Terrarium: Multi-turn data engine for evaluating and optimizing LLM agents in living environments.</h1>
+# Terrarium: Multi-turn data engine for evaluating and optimizing LLM agents in living environments.
 
-<div align="center">
 
-[![Evolvent AI][evolvent-image]][evolvent-url]
-[![Blog][blog-image]][blog-url]
-[![Discord][discord-image]][discord-url]
-[![X][x-image]][x-url]
-[![LinkedIn][linkedin-image]][linkedin-url]
-[![Hugging Face][huggingface-image]][huggingface-url]
-[![Star][star-image]][star-url]
-[![License][license-image]][license-url]
 
-</div>
+[Evolvent AI](https://evolvent.co)
+[Blog](https://evolvent.co/en/research/terrarium)
+[Discord](https://discord.gg/RCFuy6wttC)
+[X](https://x.com/Evolvent_AI)
+[LinkedIn](https://www.linkedin.com/company/evolvent-ai)
+[Hugging Face](https://huggingface.co/EvolventAI)
+[Star](https://github.com/evolvent-ai/Terrarium/stargazers)
+[License](https://github.com/evolvent-ai/Terrarium/blob/main/LICENSE)
+
+
 
 Terrarium is a framework for generating rich, multi-turn agent rollouts across living and evolving environments. You write task programs in pure Python that orchestrate a living environment — sending emails, populating databases, uploading files — drive LLM agents through it, and evaluate the outcomes. Think of it as a terrarium for agents — a contained world that lives and breathes while you watch how your agents behave.
 
 Use it to benchmark agents, collect training trajectories, or build evaluation datasets that capture the complexity of real-world workflows.
 
-https://github.com/user-attachments/assets/eeaf0af8-4915-4482-ae2f-917870f09f11
+[https://github.com/user-attachments/assets/eeaf0af8-4915-4482-ae2f-917870f09f11](https://github.com/user-attachments/assets/eeaf0af8-4915-4482-ae2f-917870f09f11)
 
 [[video link]](https://oss.evolvent.co/articles/terrarium-1.mp4)
 
@@ -29,14 +29,16 @@ https://github.com/user-attachments/assets/eeaf0af8-4915-4482-ae2f-917870f09f11
 
 The way we evaluate and train agents has evolved through three phases:
 
-|                  | Phase 1: Static QA               | Phase 2: Single-turn Agents | Phase 3: Multi-turn Agents & Living Environments |
-| ---------------- | -------------------------------- | --------------------------- | ------------------------------------------------ |
-| Representative   | [lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness), [lmms-eval](https://github.com/EvolvingLMMs-Lab/lmms-eval) | [Harbor](https://github.com/harbor-framework/harbor) | **Terrarium** |
-| Interaction      | Single-turn                      | Single-turn, multi-step     | Multi-turn, multi-step                           |
-| Environment      | None                             | Static sandboxes            | Composable, mutates between turns                |
-| Control flow     | —                                | Linear                      | Loops & branches                                 |
-| Verification     | Ground-truth matching            | Final test script           | Programmatic checkers at any stage               |
-| Proactive agents | —                                | —                           | Supported                                        |
+
+|                  | Phase 1: Static QA                                                                                                                       | Phase 2: Single-turn Agents                          | Phase 3: Multi-turn Agents & Living Environments |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------ |
+| Representative   | [lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness), [lmms-eval](https://github.com/EvolvingLMMs-Lab/lmms-eval) | [Harbor](https://github.com/harbor-framework/harbor) | **Terrarium**                                    |
+| Interaction      | Single-turn                                                                                                                              | Single-turn, multi-step                              | Multi-turn, multi-step                           |
+| Environment      | None                                                                                                                                     | Static sandboxes                                     | Composable, mutates between turns                |
+| Control flow     | —                                                                                                                                        | Linear                                               | Loops & branches                                 |
+| Verification     | Ground-truth matching                                                                                                                    | Final test script                                    | Programmatic checkers at any stage               |
+| Proactive agents | —                                                                                                                                        | —                                                    | Supported                                        |
+
 
 Existing frameworks stop at Phase 2. They have limited support for environments that change mid-task, multi-turn agent interactions, or task logic with loops and branches. As agents move beyond coding into personal assistance, workflow automation, and proactive monitoring, these limitations become blocking. We built Terrarium to close this gap.
 
@@ -52,7 +54,7 @@ Existing frameworks stop at Phase 2. They have limited support for environments 
 
 A Claude Code agent running the **Branch & Loop** task — checking email, writing study notes in Notion, looping to expand content, and adapting to a mid-task schedule change.
 
-https://github.com/user-attachments/assets/6c2bcd92-b7a6-4baa-8e59-475e3c800eb1
+[https://github.com/user-attachments/assets/6c2bcd92-b7a6-4baa-8e59-475e3c800eb1](https://github.com/user-attachments/assets/6c2bcd92-b7a6-4baa-8e59-475e3c800eb1)
 
 [[video link]](https://oss.evolvent.co/articles/terrarium.mp4)
 
@@ -390,13 +392,13 @@ def proactive_webhook(env, agent):
 
 ## Roadmap
 
-- [ ] **More environment capabilities** — browser automation, Slack, MySQL/SQLite, cloud storage, and more
-- [ ] **More agent adapters** — Anthropic SDK, OpenAI, LangChain, local models, and others
-- [ ] **More sandbox providers** — support sandbox backends beyond Docker (e.g., cloud VMs, lightweight runtimes)
-- [ ] **Benchmark integrations** — integrate more existing benchmarks beyond tau2-bench
-- [ ] **CLI enhancements** — `terrarium init`, `terrarium validate`, result comparison, and richer output
-- [ ] **Execution engine** — async task submission, distributed execution, and scalable orchestration
-- [ ] **Documentation site** — full API reference, tutorials, and contributor guide
+- **More environment capabilities** — browser automation, Slack, MySQL/SQLite, cloud storage, and more
+- **More agent adapters** — Anthropic SDK, OpenAI, LangChain, local models, and others
+- **More sandbox providers** — support sandbox backends beyond Docker (e.g., cloud VMs, lightweight runtimes)
+- **Benchmark integrations** — integrate more existing benchmarks beyond tau2-bench
+- **CLI enhancements** — `terrarium init`, `terrarium validate`, result comparison, and richer output
+- **Execution engine** — async task submission, distributed execution, and scalable orchestration
+- **Documentation site** — full API reference, tutorials, and contributor guide
 
 ## Acknowledgements
 
@@ -405,20 +407,3 @@ Terrarium's CLI and execution infrastructure draws inspiration from [Harbor](htt
 ## License
 
 This project is licensed under the [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) license. See [LICENSE](LICENSE) for details.
-
-[evolvent-image]: https://img.shields.io/badge/Evolvent_AI-evolvent.co-0f141b
-[evolvent-url]: https://evolvent.co
-[blog-image]: https://img.shields.io/badge/Technical_Blog-Terrarium-EB3ECC
-[blog-url]: https://evolvent.co/en/research/terrarium
-[discord-image]: https://img.shields.io/badge/Discord-Join%20Us-5865F2?logo=discord&logoColor=white
-[discord-url]: https://discord.gg/RCFuy6wttC
-[x-image]: https://img.shields.io/twitter/follow/Evolvent_AI?style=social
-[x-url]: https://x.com/Evolvent_AI
-[huggingface-image]: https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-EvolventAI-ffc107?color=ffc107&logoColor=white
-[huggingface-url]: https://huggingface.co/EvolventAI
-[star-image]: https://img.shields.io/github/stars/evolvent-ai/Terrarium?label=stars&logo=github&color=brightgreen
-[star-url]: https://github.com/evolvent-ai/Terrarium/stargazers
-[linkedin-image]: https://img.shields.io/badge/LinkedIn-Evolvent_AI-0A66C2?logo=linkedin&logoColor=white
-[linkedin-url]: https://www.linkedin.com/company/evolvent-ai
-[license-image]: https://img.shields.io/badge/License-CC_BY--NC_4.0-blue.svg
-[license-url]: https://github.com/evolvent-ai/Terrarium/blob/main/LICENSE
