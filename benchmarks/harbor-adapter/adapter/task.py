@@ -151,6 +151,7 @@ def _read_reward(workspace) -> float:
 
 
 def _register_skills(workspace, agent, skills_dir: str) -> None:
+    """Copy skills from the image-provided path into the agent's skills config dir."""
     dest = agent.skills_dir
     if dest is None:
         logger.warning(
