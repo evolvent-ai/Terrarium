@@ -150,17 +150,20 @@ class DockerSandboxProvider(SandboxProvider):
 
     def create(self, spec: SandboxSpec) -> Sandbox:
         image_name = self._resolve_image(spec.image)
-        port_bindings = {f"{p}/tcp": None for p in spec.ports}
-        environment = spec.env or {}
-        volumes = spec.volumes or {}
 
-        kwargs = {
-            "image": image_name,
-            "detach": True,
-            "ports": port_bindings,
-            "environment": environment,
-            "network": self._network.name if self._network else None,
-        }
+        kwargs: dict = {"image": image_name, "detach": True}
+
+        if self._network:
+            kwargs["network"] = self._network.name
+        if spec.ports:
+            kwargs["ports"] = {f"{p}/tcp": None for p in spec.ports}
+        if spec.env:
+            kwargs["environment"] = spec.env
+        if spec.volumes:
+            kwargs["volumes"] = {
+                host: {"bind": container, "mode": "rw"}
+                for host, container in spec.volumes.items()
+            }
         if spec.name:
             # External network names don't carry session_id; add it to avoid
             # collisions across environment instances sharing the same network.
@@ -170,13 +173,16 @@ class DockerSandboxProvider(SandboxProvider):
             else:
                 prefix = self._network.name
             kwargs["name"] = f"{prefix}-{spec.name}"
-        if volumes:
-            kwargs["volumes"] = {
-                host: {"bind": container, "mode": "rw"}
-                for host, container in volumes.items()
-            }
         if spec.command is not None:
             kwargs["command"] = spec.command
+        if spec.workdir is not None:
+            kwargs["working_dir"] = spec.workdir
+        if spec.resources.cpus is not None:
+            kwargs["nano_cpus"] = int(spec.resources.cpus * 1_000_000_000)
+        if spec.resources.memory is not None:
+            kwargs["mem_limit"] = spec.resources.memory
+        if spec.resources.storage is not None:
+            kwargs["storage_opt"] = {"size": spec.resources.storage}
 
         logger.info("Starting container: image={} name={}", image_name, kwargs.get("name"))
         try:

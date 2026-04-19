@@ -69,9 +69,8 @@ def params():
             continue
 
         for field in (
-            "cpus", "memory", "memory_mb", "storage", "storage_mb",
             "gpus", "gpu_types", "allow_internet", "mcp_servers",
-            "skills_dir", "workdir", "build_timeout_sec", "healthcheck",
+            "skills_dir", "build_timeout_sec", "healthcheck",
         ):
             if field in env_cfg:
                 logger.warning("[harbor:{}] ignoring [environment].{}", task_name, field)
@@ -101,6 +100,21 @@ def params():
             workspace["image"] = {"name": image_name}
         else:
             workspace["image"] = {"build": {"context": str(td / "environment")}}
+        resources: dict = {}
+        if "cpus" in env_cfg:
+            resources["cpus"] = env_cfg["cpus"]
+        if "memory_mb" in env_cfg:
+            resources["memory"] = f"{env_cfg['memory_mb']}M"
+        elif "memory" in env_cfg:
+            resources["memory"] = env_cfg["memory"]
+        if "storage_mb" in env_cfg:
+            resources["storage"] = f"{env_cfg['storage_mb']}M"
+        elif "storage" in env_cfg:
+            resources["storage"] = env_cfg["storage"]
+        if resources:
+            workspace["resources"] = resources
+        if "workdir" in env_cfg:
+            workspace["workdir"] = env_cfg["workdir"]
 
         yield {
             "name": task_name,
