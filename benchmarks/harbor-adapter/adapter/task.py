@@ -154,7 +154,7 @@ def _register_skills(workspace, agent, skills_dir: str) -> None:
     dest = agent.skills_dir
     if dest is None:
         logger.warning(
-            "[harbor] agent {!r} does not support skills; ignoring skills_dir={}",
+            "[harbor] agent '{}' does not support skills; ignoring skills_dir={}",
             agent.name(), skills_dir,
         )
         return
