@@ -17,6 +17,11 @@ def test_install_skill_not_supported():
         MockAgent().install_skill("/some/path")
 
 
+def test_skills_dir_defaults_to_none():
+    """Agents that don't support skills return None from skills_dir."""
+    assert MockAgent().skills_dir is None
+
+
 def test_system_prompt_setter_not_supported():
     """MockAgent inherits default system_prompt setter which raises."""
     with pytest.raises(NotImplementedError, match="system_prompt"):

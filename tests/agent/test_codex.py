@@ -225,6 +225,12 @@ class TestInstallSkill:
             agent.install_skill(tmp_path / "SKILL.md")
 
 
+class TestSkillsDir:
+    def test_returns_in_container_skills_path(self):
+        """skills_dir property exposes the in-container skills path."""
+        assert CodexAgent().skills_dir == SKILLS_DIR
+
+
 class TestAct:
     def test_reads_session(self):
         """End-to-end: exec → find session file → parse → ActResult."""

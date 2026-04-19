@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import tomllib
 from pathlib import Path
 
@@ -22,8 +23,13 @@ from terrarium.task.decorator import entry
 def harbor_task(env, agent, *, task_dir: str):
     td = Path(task_dir)
     instruction = (td / "instruction.md").read_text()
+    cfg = tomllib.loads((td / "task.toml").read_text())
 
     env.workspace.fs.upload(str(td / "tests"), "/tests")
+
+    skills_dir = cfg.get("environment", {}).get("skills_dir")
+    if skills_dir:
+        _register_skills(env.workspace, agent, skills_dir)
 
     agent.act(instruction)
 
@@ -70,7 +76,7 @@ def params():
 
         for field in (
             "gpus", "gpu_types", "allow_internet", "mcp_servers",
-            "skills_dir", "build_timeout_sec", "healthcheck",
+            "build_timeout_sec", "healthcheck",
         ):
             if field in env_cfg:
                 logger.warning("[harbor:{}] ignoring [environment].{}", task_name, field)
@@ -142,3 +148,16 @@ def _read_reward(workspace) -> float:
             f"{sorted(rewards.keys())}"
         )
     return float(next(iter(rewards.values())))
+
+
+def _register_skills(workspace, agent, skills_dir: str) -> None:
+    dest = agent.skills_dir
+    if dest is None:
+        logger.warning(
+            "[harbor] agent '{}' does not support skills; ignoring skills_dir={}",
+            agent.name(), skills_dir,
+        )
+        return
+    src = shlex.quote(skills_dir)
+    dst = shlex.quote(dest)
+    workspace.shell.exec(f"mkdir -p {dst} && cp -r {src}/* {dst}/")
