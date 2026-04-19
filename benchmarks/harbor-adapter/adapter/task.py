@@ -20,12 +20,14 @@ from terrarium.task.decorator import entry
 
 
 @entry(capabilities=["workspace"])
-def harbor_task(env, agent, *, task_dir: str, skills_dir: str | None = None):
+def harbor_task(env, agent, *, task_dir: str):
     td = Path(task_dir)
     instruction = (td / "instruction.md").read_text()
+    cfg = tomllib.loads((td / "task.toml").read_text())
 
     env.workspace.fs.upload(str(td / "tests"), "/tests")
 
+    skills_dir = cfg.get("environment", {}).get("skills_dir")
     if skills_dir:
         _register_skills(env.workspace, agent, skills_dir)
 
@@ -140,13 +142,9 @@ def params():
         if "workdir" in env_cfg:
             workspace["workdir"] = env_cfg["workdir"]
 
-        params: dict = {"task_dir": str(td)}
-        if "skills_dir" in env_cfg:
-            params["skills_dir"] = env_cfg["skills_dir"]
-
         yield {
             "name": task_name,
-            "params": params,
+            "params": {"task_dir": str(td)},
             "capabilities_config": {"workspace": workspace},
         }
 
