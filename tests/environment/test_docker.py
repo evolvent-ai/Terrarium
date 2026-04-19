@@ -5,7 +5,7 @@ import docker.errors
 
 from terrarium.environment.exceptions import ProviderError
 from terrarium.environment.providers.docker import DockerSandbox, DockerSandboxProvider
-from terrarium.environment.sandbox import BuildSpec, ImageSpec, SandboxSpec
+from terrarium.environment.sandbox import BuildSpec, ImageSpec, ResourceLimits, SandboxSpec
 
 
 class TestDockerSandbox:
@@ -131,6 +131,74 @@ class TestDockerSandboxProvider:
         provider.setup()
         with pytest.raises(ProviderError, match="Failed to build"):
             provider.create(SandboxSpec(image=ImageSpec(build=BuildSpec(context=str(tmp_path)))))
+
+    @patch("terrarium.environment.providers.docker.docker.from_env")
+    def test_create_omits_resource_kwargs_by_default(self, mock_from_env):
+        client = self._make_client(image_cached=True)
+        mock_from_env.return_value = client
+
+        provider = DockerSandboxProvider()
+        provider.setup()
+        provider.create(SandboxSpec(image=ImageSpec(name="alpine:3.19")))
+
+        run_kwargs = client.containers.run.call_args.kwargs
+        assert "nano_cpus" not in run_kwargs
+        assert "mem_limit" not in run_kwargs
+        assert "storage_opt" not in run_kwargs
+        assert "working_dir" not in run_kwargs
+
+    @patch("terrarium.environment.providers.docker.docker.from_env")
+    def test_create_forwards_cpus_as_nano_cpus(self, mock_from_env):
+        client = self._make_client(image_cached=True)
+        mock_from_env.return_value = client
+
+        provider = DockerSandboxProvider()
+        provider.setup()
+        provider.create(SandboxSpec(
+            image=ImageSpec(name="alpine:3.19"),
+            resources=ResourceLimits(cpus=1.5),
+        ))
+
+        assert client.containers.run.call_args.kwargs["nano_cpus"] == 1_500_000_000
+
+    @patch("terrarium.environment.providers.docker.docker.from_env")
+    def test_create_forwards_memory(self, mock_from_env):
+        client = self._make_client(image_cached=True)
+        mock_from_env.return_value = client
+
+        provider = DockerSandboxProvider()
+        provider.setup()
+        provider.create(SandboxSpec(
+            image=ImageSpec(name="alpine:3.19"),
+            resources=ResourceLimits(memory="2G"),
+        ))
+
+        assert client.containers.run.call_args.kwargs["mem_limit"] == "2G"
+
+    @patch("terrarium.environment.providers.docker.docker.from_env")
+    def test_create_forwards_storage_as_storage_opt(self, mock_from_env):
+        client = self._make_client(image_cached=True)
+        mock_from_env.return_value = client
+
+        provider = DockerSandboxProvider()
+        provider.setup()
+        provider.create(SandboxSpec(
+            image=ImageSpec(name="alpine:3.19"),
+            resources=ResourceLimits(storage="10G"),
+        ))
+
+        assert client.containers.run.call_args.kwargs["storage_opt"] == {"size": "10G"}
+
+    @patch("terrarium.environment.providers.docker.docker.from_env")
+    def test_create_forwards_workdir_as_working_dir(self, mock_from_env):
+        client = self._make_client(image_cached=True)
+        mock_from_env.return_value = client
+
+        provider = DockerSandboxProvider()
+        provider.setup()
+        provider.create(SandboxSpec(image=ImageSpec(name="alpine:3.19"), workdir="/app"))
+
+        assert client.containers.run.call_args.kwargs["working_dir"] == "/app"
 
 
 class TestDeriveTag:
