@@ -34,7 +34,7 @@ def harbor_task(env, agent, *, task_dir: str):
     agent.act(instruction)
 
     env.workspace.shell.exec("mkdir -p /logs/verifier")
-    verifier_env = cfg.get("verifier", {}).get("env", None)
+    verifier_env = _resolve_env_vars(cfg.get("verifier", {}).get("env", {}))
     env.workspace.shell.exec("bash /tests/test.sh", env=verifier_env)
 
     return CheckerResults(checks=[], score=_read_reward(env.workspace))
@@ -44,7 +44,8 @@ def harbor_task(env, agent, *, task_dir: str):
 def params():
     dataset_dir = os.environ.get("HARBOR_DATASET_DIR")
     if not dataset_dir:
-        raise RuntimeError("HARBOR_DATASET_DIR environment variable is not set")
+        logger.warning("[harbor] environment variable HARBOR_DATASET_DIR is not set")
+        return
 
     for td in sorted(Path(dataset_dir).iterdir()):
         if not (td / "task.toml").exists():
@@ -93,16 +94,17 @@ def params():
         if "solution" in cfg or (td / "solution").exists():
             logger.warning("[harbor:{}] ignoring [solution]", task_name)
 
-        templated = [k for k, v in env_cfg.get("env", {}).items()
-                     if isinstance(v, str) and re.search(r"\$\{[^}]+\}", v)]
-        if templated:
-            logger.warning("[harbor:{}] ignoring ${{VAR}} templates in [environment].env: {}", task_name, templated)
-
         metadata = [k for k in ("schema_version", "task", "metadata") if k in cfg]
         if metadata:
             logger.warning("[harbor:{}] ignoring metadata sections: {}", task_name, metadata)
 
-        workspace: dict = {"env": env_cfg.get("env", {})}
+        try:
+            resolved_env = _resolve_env_vars(env_cfg.get("env", {}))
+        except ValueError as e:
+            logger.warning("[harbor:{}] skipping: failed to resolve [environment].env: {}", task_name, e)
+            continue
+
+        workspace: dict = {"env": resolved_env}
         if image_name:
             workspace["image"] = {"name": image_name}
         else:
@@ -163,3 +165,25 @@ def _register_skills(workspace, agent, skills_dir: str) -> None:
     src = shlex.quote(skills_dir)
     dst = shlex.quote(dest)
     workspace.shell.exec(f"mkdir -p {dst} && cp -r {src}/* {dst}/")
+
+
+_TEMPLATE_PATTERN = re.compile(r"\$\{([^}:]+)(?::-(.*))?\}")
+
+
+def _resolve_env_vars(env_dict: dict[str, str]) -> dict[str, str]:
+    """Expand ${VAR} and ${VAR:-default} templates in env values using host env."""
+    resolved: dict[str, str] = {}
+    for key, value in env_dict.items():
+        match = _TEMPLATE_PATTERN.fullmatch(value)
+        if match:
+            var_name = match.group(1)
+            default = match.group(2)
+            if var_name in os.environ:
+                resolved[key] = os.environ[var_name]
+            elif default is not None:
+                resolved[key] = default
+            else:
+                raise ValueError(f"Environment variable '{var_name}' not found in host environment")
+        else:
+            resolved[key] = value
+    return resolved
