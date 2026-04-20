@@ -42,6 +42,19 @@ class TestDockerSandbox:
         sandbox._container.stop.assert_called_once()
         sandbox._container.remove.assert_called_once()
 
+    def test_exec_forwards_env(self):
+        sandbox = self._make_sandbox()
+        sandbox.exec("echo hello", env={"FOO": "1", "BAR": "x"})
+        sandbox._container.exec_run.assert_called_once_with(
+            "echo hello", demux=True, environment={"FOO": "1", "BAR": "x"},
+        )
+
+    def test_exec_omits_environment_kwarg_when_env_unset(self):
+        sandbox = self._make_sandbox()
+        sandbox.exec("echo hello")
+        kwargs = sandbox._container.exec_run.call_args.kwargs
+        assert "environment" not in kwargs
+
 
 class TestDockerSandboxProvider:
     def _make_client(self, image_cached: bool = False):

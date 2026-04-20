@@ -60,8 +60,17 @@ class Sandbox(ABC):
     """A running sandbox — the universal environment interface."""
 
     @abstractmethod
-    def exec(self, command: str | list[str], timeout: float | None = None) -> ExecResult:
-        """Execute a command inside the sandbox."""
+    def exec(
+        self,
+        command: str | list[str],
+        timeout: float | None = None,
+        env: dict[str, str] | None = None,
+    ) -> ExecResult:
+        """Execute a command inside the sandbox.
+
+        When ``env`` is provided, the variables are added on top of the
+        container's existing environment for this single exec invocation.
+        """
 
     @abstractmethod
     def read_file(self, path: str) -> bytes:

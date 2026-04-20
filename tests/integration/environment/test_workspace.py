@@ -70,3 +70,11 @@ class TestWorkspaceIntegration:
             result = env.workspace.shell.exec("echo ok")
             assert result.exit_code == 0
             assert "ok" in result.stdout
+
+    def test_shell_exec_env(self):
+        with ComposableEnvironment(["workspace"]) as env:
+            result = env.workspace.shell.exec(
+                "echo $FOO-$BAR", env={"FOO": "hello", "BAR": "world"},
+            )
+            assert result.exit_code == 0
+            assert result.stdout.strip() == "hello-world"
