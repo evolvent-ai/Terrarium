@@ -8,7 +8,7 @@ class FakeSandbox(Sandbox):
     def __init__(self):
         self.exec_result = ExecResult(exit_code=0, stdout="ok", stderr="")
 
-    def exec(self, command, timeout=None):
+    def exec(self, command, timeout=None, env=None):
         return self.exec_result
 
     def read_file(self, path):
@@ -101,7 +101,7 @@ def test_shell_service_exec_with_timeout():
     shell = ShellService(sandbox)
     result = shell.exec("echo hi", timeout=5)
     assert result.exit_code == 0
-    sandbox.exec.assert_called_once_with(["sh", "-c", "echo hi"], timeout=5)
+    sandbox.exec.assert_called_once_with(["sh", "-c", "echo hi"], timeout=5, env=None)
 
 
 def test_shell_service_exec_no_timeout():
@@ -109,7 +109,17 @@ def test_shell_service_exec_no_timeout():
     sandbox.exec.return_value = ExecResult(exit_code=0, stdout="ok", stderr="")
     shell = ShellService(sandbox)
     shell.exec("echo hi")
-    sandbox.exec.assert_called_once_with(["sh", "-c", "echo hi"], timeout=None)
+    sandbox.exec.assert_called_once_with(["sh", "-c", "echo hi"], timeout=None, env=None)
+
+
+def test_shell_service_exec_forwards_env():
+    sandbox = MagicMock(spec=Sandbox)
+    sandbox.exec.return_value = ExecResult(exit_code=0, stdout="ok", stderr="")
+    shell = ShellService(sandbox)
+    shell.exec("echo hi", env={"FOO": "1", "BAR": "x"})
+    sandbox.exec.assert_called_once_with(
+        ["sh", "-c", "echo hi"], timeout=None, env={"FOO": "1", "BAR": "x"},
+    )
 
 
 def test_filesystem_service_exists():

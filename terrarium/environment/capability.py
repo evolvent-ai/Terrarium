@@ -59,11 +59,11 @@ class ShellService:
     def __init__(self, sandbox: Sandbox):
         self._sandbox = sandbox
 
-    def exec(self, command: str | list[str], timeout: float | None = None) -> ExecResult:
-        logger.debug("shell.exec command={} timeout={}", command, timeout)
+    def exec(self, command: str | list[str], timeout: float | None = None, env: dict[str, str] | None = None) -> ExecResult:
+        logger.debug("shell.exec command={} timeout={} env={}", command, timeout, env)
         if isinstance(command, list):
             command = " ".join(command)
-        return self._sandbox.exec(["sh", "-c", command], timeout=timeout)
+        return self._sandbox.exec(["sh", "-c", command], timeout=timeout, env=env)
 
 
 class BaseCapability(ABC):

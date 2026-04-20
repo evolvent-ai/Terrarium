@@ -19,7 +19,7 @@ class TestDockerSandbox:
         sandbox = self._make_sandbox()
         result = sandbox.exec("echo hello")
         sandbox._container.exec_run.assert_called_once_with(
-            "echo hello", demux=True
+            "echo hello", demux=True, environment=None,
         )
 
     def test_exec_list(self):
@@ -27,7 +27,7 @@ class TestDockerSandbox:
         sandbox._container.exec_run.return_value = (0, (b"out", b"err"))
         result = sandbox.exec(["echo", "hello"])
         sandbox._container.exec_run.assert_called_once_with(
-            ["echo", "hello"], demux=True
+            ["echo", "hello"], demux=True, environment=None,
         )
 
     def test_get_host(self):
@@ -41,6 +41,13 @@ class TestDockerSandbox:
         sandbox.stop()
         sandbox._container.stop.assert_called_once()
         sandbox._container.remove.assert_called_once()
+
+    def test_exec_forwards_env(self):
+        sandbox = self._make_sandbox()
+        sandbox.exec("echo hello", env={"FOO": "1", "BAR": "x"})
+        sandbox._container.exec_run.assert_called_once_with(
+            "echo hello", demux=True, environment={"FOO": "1", "BAR": "x"},
+        )
 
 
 class TestDockerSandboxProvider:
