@@ -34,7 +34,7 @@ def harbor_task(env, agent, *, task_dir: str):
     agent.act(instruction)
 
     env.workspace.shell.exec("mkdir -p /logs/verifier")
-    verifier_env = cfg.get("verifier", {}).get("env") or None
+    verifier_env = cfg.get("verifier", {}).get("env")
     env.workspace.shell.exec("bash /tests/test.sh", env=verifier_env)
 
     return CheckerResults(checks=[], score=_read_reward(env.workspace))
