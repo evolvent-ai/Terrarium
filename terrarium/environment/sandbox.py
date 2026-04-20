@@ -60,7 +60,7 @@ class Sandbox(ABC):
     """A running sandbox — the universal environment interface."""
 
     @abstractmethod
-    def exec(self, command: str | list[str], timeout: float | None = None) -> ExecResult:
+    def exec(self, command: str | list[str], timeout: float | None = None, env: dict[str, str] | None = None) -> ExecResult:
         """Execute a command inside the sandbox."""
 
     @abstractmethod
