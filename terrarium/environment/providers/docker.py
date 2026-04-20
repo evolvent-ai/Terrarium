@@ -30,12 +30,10 @@ class DockerSandbox(Sandbox):
         timeout: float | None = None,
         env: dict[str, str] | None = None,
     ) -> ExecResult:
-        exec_kwargs: dict = {"demux": True}
-        if env:
-            exec_kwargs["environment"] = env
-
         if timeout is None:
-            exit_code, (stdout_bytes, stderr_bytes) = self._container.exec_run(command, **exec_kwargs)
+            exit_code, (stdout_bytes, stderr_bytes) = self._container.exec_run(
+                command, demux=True, environment=env,
+            )
             return ExecResult(
                 exit_code=exit_code,
                 stdout=(stdout_bytes or b"").decode(),
@@ -44,7 +42,9 @@ class DockerSandbox(Sandbox):
 
         import concurrent.futures
         pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        future = pool.submit(self._container.exec_run, command, **exec_kwargs)
+        future = pool.submit(
+            self._container.exec_run, command, demux=True, environment=env,
+        )
         pool.shutdown(wait=False)
         try:
             exit_code, (stdout_bytes, stderr_bytes) = future.result(timeout=timeout)

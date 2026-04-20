@@ -19,7 +19,7 @@ class TestDockerSandbox:
         sandbox = self._make_sandbox()
         result = sandbox.exec("echo hello")
         sandbox._container.exec_run.assert_called_once_with(
-            "echo hello", demux=True
+            "echo hello", demux=True, environment=None,
         )
 
     def test_exec_list(self):
@@ -27,7 +27,7 @@ class TestDockerSandbox:
         sandbox._container.exec_run.return_value = (0, (b"out", b"err"))
         result = sandbox.exec(["echo", "hello"])
         sandbox._container.exec_run.assert_called_once_with(
-            ["echo", "hello"], demux=True
+            ["echo", "hello"], demux=True, environment=None,
         )
 
     def test_get_host(self):
@@ -48,12 +48,6 @@ class TestDockerSandbox:
         sandbox._container.exec_run.assert_called_once_with(
             "echo hello", demux=True, environment={"FOO": "1", "BAR": "x"},
         )
-
-    def test_exec_omits_environment_kwarg_when_env_unset(self):
-        sandbox = self._make_sandbox()
-        sandbox.exec("echo hello")
-        kwargs = sandbox._container.exec_run.call_args.kwargs
-        assert "environment" not in kwargs
 
 
 class TestDockerSandboxProvider:
