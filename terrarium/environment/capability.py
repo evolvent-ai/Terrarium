@@ -59,12 +59,7 @@ class ShellService:
     def __init__(self, sandbox: Sandbox):
         self._sandbox = sandbox
 
-    def exec(
-        self,
-        command: str | list[str],
-        timeout: float | None = None,
-        env: dict[str, str] | None = None,
-    ) -> ExecResult:
+    def exec(self, command: str | list[str], timeout: float | None = None, env: dict[str, str] | None = None) -> ExecResult:
         logger.debug("shell.exec command={} timeout={} env={}", command, timeout, env)
         if isinstance(command, list):
             command = " ".join(command)
