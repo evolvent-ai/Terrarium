@@ -34,7 +34,8 @@ def harbor_task(env, agent, *, task_dir: str):
     agent.act(instruction)
 
     env.workspace.shell.exec("mkdir -p /logs/verifier")
-    env.workspace.shell.exec("bash /tests/test.sh")
+    verifier_env = cfg.get("verifier", {}).get("env") or None
+    env.workspace.shell.exec("bash /tests/test.sh", env=verifier_env)
 
     return CheckerResults(checks=[], score=_read_reward(env.workspace))
 
@@ -85,7 +86,7 @@ def params():
             if field in cfg.get("agent", {}):
                 logger.warning("[harbor:{}] ignoring [agent].{}", task_name, field)
 
-        for field in ("timeout_sec", "user", "env"):
+        for field in ("timeout_sec", "user"):
             if field in cfg.get("verifier", {}):
                 logger.warning("[harbor:{}] ignoring [verifier].{}", task_name, field)
 
