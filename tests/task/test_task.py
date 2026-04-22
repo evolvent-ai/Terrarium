@@ -32,13 +32,15 @@ def test_capabilities_config_from_entry(tmp_path):
     assert task.capabilities_config == {"postgres": {"db_name": "x"}}
 
 
-def test_metadata():
-    """Task exposes parsed metadata from task.toml."""
+def test_spec():
+    """Task.spec exposes the parsed TaskSpec."""
     task = Task(SAMPLE_TASK_DIR)
-    assert task.metadata.author == "test"
-    assert task.metadata.difficulty == "easy"
-    assert task.metadata.category == "test"
-    assert task.metadata.description == "A sample task for testing"
+    assert task.spec.metadata.name == "sample_task"
+    assert task.spec.metadata.author == "test"
+    assert task.spec.metadata.difficulty == "easy"
+    assert task.spec.metadata.category == "test"
+    assert task.spec.metadata.tags == ["test"]
+    assert task.spec.metadata.description == "A sample task for testing"
 
 
 def test_nonexistent_dir():

@@ -9,6 +9,7 @@ FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 PARAM_TASK_DIR = FIXTURES_DIR / "parameterized_task"
 PARAM_CAPS_TASK_DIR = FIXTURES_DIR / "parameterized_caps_task"
 PARAM_CONFIG_TASK_DIR = FIXTURES_DIR / "parameterized_config_task"
+PARAM_METADATA_TASK_DIR = FIXTURES_DIR / "parameterized_metadata_task"
 
 
 def test_load_non_parameterized():
@@ -83,7 +84,25 @@ def test_load_parameterized_metadata():
     """Parameterized instances share the same metadata from task.toml."""
     tasks = Task.resolve(PARAM_TASK_DIR)
     for t in tasks:
-        assert t.metadata.author == "test"
+        assert t.spec.metadata.author == "test"
+
+
+def test_load_parameterized_metadata_override():
+    """A 'metadata' key on a parameterize yield partially overrides TaskSpec.metadata."""
+    tasks = Task.resolve(PARAM_METADATA_TASK_DIR)
+    inherits = next(t for t in tasks if t.name == "inherits")
+    overrides = next(t for t in tasks if t.name == "overrides")
+
+    # Inheriting variant keeps the task.toml metadata.
+    assert inherits.spec.metadata.difficulty == "easy"
+    assert inherits.spec.metadata.tags == ["base"]
+
+    # Overriding variant picks up the yield's metadata for listed fields only,
+    # inheriting the rest (author/category/description) from task.toml.
+    assert overrides.spec.metadata.difficulty == "hard"
+    assert overrides.spec.metadata.tags == ["edge", "regression"]
+    assert overrides.spec.metadata.author == "test"
+    assert overrides.spec.metadata.category == "test"
 
 
 def test_dataset_discovers_parameterized(tmp_path):

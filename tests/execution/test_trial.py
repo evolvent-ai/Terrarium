@@ -170,6 +170,24 @@ async def test_agent_workspace_image_is_fallback(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_task_info_persists_spec_and_capabilities(tmp_path):
+    """TaskInfo captures the task's spec + capabilities into the trial result."""
+    task_dir = _write_task(
+        tmp_path / "t",
+        "capabilities=['postgres'], "
+        "capabilities_config={'postgres': {'db_name': 'shop'}}",
+    )
+
+    mock_rt = _make_mock_rt()
+    with patch("terrarium.execution.trial.ComposableEnvironment", return_value=mock_rt):
+        result = await Trial(_make_config(task_dir=task_dir)).run()
+
+    assert result.task_info.spec.metadata.name == "t"
+    assert result.task_info.capabilities == ["postgres"]
+    assert result.task_info.capabilities_config == {"postgres": {"db_name": "shop"}}
+
+
+@pytest.mark.asyncio
 async def test_timing_info_recorded():
     """setup_timing and execution_timing are populated."""
     mock_rt = _make_mock_rt()
