@@ -1,0 +1,7 @@
+[metadata]
+name = "parameterized_metadata_task"
+author = "test"
+difficulty = "easy"
+category = "test"
+tags = ["base"]
+description = "Parametric task exercising metadata override"
