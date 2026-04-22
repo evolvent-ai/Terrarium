@@ -83,7 +83,7 @@ def test_load_parameterized_metadata():
     """Parameterized instances share the same metadata from task.toml."""
     tasks = Task.resolve(PARAM_TASK_DIR)
     for t in tasks:
-        assert t.metadata.author == "test"
+        assert t.spec.metadata.author == "test"
 
 
 def test_dataset_discovers_parameterized(tmp_path):

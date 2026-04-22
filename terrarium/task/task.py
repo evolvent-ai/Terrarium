@@ -7,7 +7,7 @@ from functools import partial
 from pathlib import Path
 from typing import Callable
 
-from terrarium.models.spec import TaskMetadata, TaskSpec
+from terrarium.models.spec import TaskSpec
 
 
 class Task:
@@ -88,8 +88,8 @@ class Task:
         return self._capabilities_config
 
     @property
-    def metadata(self) -> TaskMetadata:
-        return self._spec.metadata
+    def spec(self) -> TaskSpec:
+        return self._spec
 
     @property
     def entry_fn(self) -> Callable:
