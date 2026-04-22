@@ -34,7 +34,14 @@ class Task:
         tasks = []
         for p in gen_fn():
             t = deepcopy(base)
-            t._spec.metadata.name = p["name"]
+            t._spec = TaskSpec.model_validate({
+                **t._spec.model_dump(),
+                "metadata": {
+                    **t._spec.metadata.model_dump(),
+                    **p.get("metadata", {}),
+                    "name": p["name"],
+                },
+            })
             t._capabilities = p.get("capabilities", base._capabilities)
             t._capabilities_config = p.get(
                 "capabilities_config", base._capabilities_config
