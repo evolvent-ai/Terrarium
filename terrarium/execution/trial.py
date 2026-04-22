@@ -84,6 +84,9 @@ class Trial:
                 name=self._task.name,
                 path=cfg.task.path,
                 source=cfg.task.source,
+                spec=self._task.spec,
+                capabilities=self._task.capabilities,
+                capabilities_config=self._task.capabilities_config,
             ),
             agent_info=AgentInfo(
                 name=self._agent.name(),

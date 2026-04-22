@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, Field, computed_field
 from terrarium.models.checker import CheckerResults
 from terrarium.models.common import ExceptionInfo
+from terrarium.models.spec import TaskSpec
 from terrarium.models.trajectory import Message, Trajectory
 
 
@@ -14,6 +15,9 @@ class TaskInfo(BaseModel):
     name: str
     path: str
     source: str = "adhoc"
+    spec: TaskSpec = Field(default_factory=TaskSpec)
+    capabilities: list[str] = Field(default_factory=list)
+    capabilities_config: dict[str, dict] = Field(default_factory=dict)
 
 
 class AgentInfo(BaseModel):
