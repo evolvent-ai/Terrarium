@@ -68,12 +68,11 @@ def params():
 
         metadata_cfg = cfg.get("metadata", {})
         authors = task_cfg.get("authors", [])
-        author = ", ".join(a["name"] for a in authors) or None
         task_metadata = {
-            "author": author,
+            "author": ", ".join(a["name"] for a in authors) or metadata_cfg.get("author_name"),
             "difficulty": metadata_cfg.get("difficulty"),
             "category": metadata_cfg.get("category"),
-            "tags": task_cfg.get("keywords", []),
+            "tags": task_cfg.get("keywords") or metadata_cfg.get("tags", []),
             "description": task_cfg.get("description"),
         }
 
