@@ -5,11 +5,13 @@ import pytest
 from terrarium.agent.codex import (
     CodexAgent,
     SESSION_DIR,
-    SKILLS_DIR,
+    TERRARIUM_DIR,
     parse_codex_session,
     _parse_json_arguments,
 )
 from terrarium.models.trajectory import ThinkingBlock, ToolUseBlock
+
+SKILLS_DIR = f"{TERRARIUM_DIR}/skills"
 
 
 class _FakeExecResult:
@@ -49,10 +51,10 @@ class _FakeShell:
     def __init__(self, responses=None):
         self._responses = responses or []
         self._call_index = 0
-        self.commands: list[str] = []
+        self.commands: list[tuple[str, str | None]] = []
 
-    def exec(self, command, timeout=None):
-        self.commands.append(command)
+    def exec(self, command, timeout=None, env=None, user=None):
+        self.commands.append((command, user))
         if self._call_index < len(self._responses):
             result = self._responses[self._call_index]
             self._call_index += 1
@@ -75,11 +77,11 @@ def _make_session(session_id="thread-1", *entries):
 
 
 def _make_agent(shell_responses=None):
-    # setup() starts with `command -v codex` to decide whether to install;
-    # prepend a success so the install path is skipped in unit tests.
+    # setup() runs: mkdir TERRARIUM_DIR (root), command -v codex, (install?), codex --version
+    mkdir_result = _FakeExecResult(exit_code=0)
     install_check = _FakeExecResult(exit_code=0, stdout="/usr/local/bin/codex")
     extra = shell_responses or [_FakeExecResult(stdout="codex-cli 0.118.0")]
-    workspace = _FakeWorkspace(shell_responses=[install_check, *extra])
+    workspace = _FakeWorkspace(shell_responses=[mkdir_result, install_check, *extra])
     agent = CodexAgent(model="gpt-5.4", api_key="sk-test")
     return agent, workspace
 
@@ -137,10 +139,10 @@ class TestEnsureInstalled:
             _FakeExecResult(exit_code=0, stdout="/usr/local/bin/codex"),
         ])
         agent._ensure_installed()
-        assert agent._workspace.shell.commands == ["command -v codex"]
+        assert agent._workspace.shell.commands == [("command -v codex", None)]
 
-    def test_runs_install_when_missing(self):
-        """If `codex` is absent, the install script is executed."""
+    def test_runs_install_as_root_when_missing(self):
+        """If `codex` is absent, the install script is executed as root."""
         agent = CodexAgent()
         agent._workspace = _FakeWorkspace(shell_responses=[
             _FakeExecResult(exit_code=1),
@@ -149,8 +151,10 @@ class TestEnsureInstalled:
         agent._ensure_installed()
         cmds = agent._workspace.shell.commands
         assert len(cmds) == 2
-        assert cmds[0] == "command -v codex"
-        assert "npm install -g @openai/codex" in cmds[1]
+        assert cmds[0] == ("command -v codex", None)
+        install_cmd, install_user = cmds[1]
+        assert "npm install -g @openai/codex" in install_cmd
+        assert install_user == "root"
 
     def test_raises_when_install_fails(self):
         """RuntimeError is raised if the install script exits non-zero."""
@@ -185,7 +189,7 @@ class TestSessionFileDiscovery:
 
 class TestInstallSkill:
     def test_uploads_directory(self, tmp_path):
-        """Uploads the skill dir to /root/.agents/skills/<name>."""
+        """Uploads the skill dir to <skills_dir>/<name>."""
         skill_dir = tmp_path / "my_skill"
         skill_dir.mkdir()
 
@@ -229,6 +233,44 @@ class TestSkillsDir:
     def test_returns_in_container_skills_path(self):
         """skills_dir property exposes the in-container skills path."""
         assert CodexAgent().skills_dir == SKILLS_DIR
+
+
+class TestSetup:
+    def test_creates_terrarium_dir_as_root(self):
+        """setup() provisions TERRARIUM_DIR as root with permissive mode."""
+        agent, workspace = _make_agent()
+        agent.setup(workspace, {})
+        first_cmd, first_user = workspace.shell.commands[0]
+        assert TERRARIUM_DIR in first_cmd
+        assert "1777" in first_cmd
+        assert first_user == "root"
+
+    def test_writes_config_toml(self, monkeypatch):
+        """setup() writes a config.toml pointing codex at a custom provider."""
+        monkeypatch.setenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
+        agent, workspace = _make_agent()
+        agent.setup(workspace, {})
+
+        writes = [(p, c) for p, c in workspace.fs.write_file_calls if p.endswith("config.toml")]
+        assert len(writes) == 1
+        path, content = writes[0]
+        text = content.decode()
+        assert path == f"{TERRARIUM_DIR}/config.toml"
+        assert 'model_provider = "terrarium"' in text
+        assert '[model_providers.terrarium]' in text
+        assert 'base_url = "https://openrouter.ai/api/v1"' in text
+        assert 'env_key = "OPENAI_API_KEY"' in text
+
+    def test_config_toml_defaults_to_openai(self, monkeypatch):
+        """Without OPENAI_BASE_URL the config points at OpenAI's endpoint."""
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+        agent, workspace = _make_agent()
+        agent.setup(workspace, {})
+
+        writes = [(p, c) for p, c in workspace.fs.write_file_calls if p.endswith("config.toml")]
+        assert len(writes) == 1
+        _, content = writes[0]
+        assert 'base_url = "https://api.openai.com/v1"' in content.decode()
 
 
 class TestAct:
@@ -334,7 +376,7 @@ class TestAct:
         assert r2.input_tokens == 200
 
         # Second exec command should use resume with the captured session id.
-        second_exec = workspace.shell.commands[-1]
+        second_exec, _ = workspace.shell.commands[-1]
         assert "exec resume" in second_exec
         assert "thread-1" in second_exec
 
