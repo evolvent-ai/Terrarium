@@ -245,6 +245,33 @@ class TestSetup:
         assert "1777" in first_cmd
         assert first_user == "root"
 
+    def test_writes_config_toml(self, monkeypatch):
+        """setup() writes a config.toml pointing codex at a custom provider."""
+        monkeypatch.setenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
+        agent, workspace = _make_agent()
+        agent.setup(workspace, {})
+
+        writes = [(p, c) for p, c in workspace.fs.write_file_calls if p.endswith("config.toml")]
+        assert len(writes) == 1
+        path, content = writes[0]
+        text = content.decode()
+        assert path == f"{TERRARIUM_DIR}/config.toml"
+        assert 'model_provider = "terrarium"' in text
+        assert '[model_providers.terrarium]' in text
+        assert 'base_url = "https://openrouter.ai/api/v1"' in text
+        assert 'env_key = "OPENAI_API_KEY"' in text
+
+    def test_config_toml_defaults_to_openai(self, monkeypatch):
+        """Without OPENAI_BASE_URL the config points at OpenAI's endpoint."""
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+        agent, workspace = _make_agent()
+        agent.setup(workspace, {})
+
+        writes = [(p, c) for p, c in workspace.fs.write_file_calls if p.endswith("config.toml")]
+        assert len(writes) == 1
+        _, content = writes[0]
+        assert 'base_url = "https://api.openai.com/v1"' in content.decode()
+
 
 class TestAct:
     def test_reads_session(self):

@@ -13,6 +13,7 @@ import re
 import shlex
 from pathlib import Path
 
+import tomli_w
 from loguru import logger
 
 from terrarium.agent.base import BaseAgent
@@ -109,7 +110,7 @@ class CodexAgent(BaseAgent):
         )
         self._ensure_installed()
         self._version = self._detect_version()
-        self._write_auth()
+        self._write_config()
         logger.info("Codex agent ready: version={}", self._version)
 
     def _ensure_installed(self) -> None:
@@ -195,9 +196,18 @@ class CodexAgent(BaseAgent):
         match = re.search(r"(\d+\.\d+\.\d+)", result.stdout)
         return match.group(1) if match else result.stdout.strip()
 
-    def _write_auth(self) -> None:
-        auth = json.dumps({"OPENAI_API_KEY": self._api_key}).encode()
-        self._workspace.fs.write_file(f"{TERRARIUM_DIR}/auth.json", auth)
+    def _write_config(self) -> None:
+        config = {
+            "model_provider": "terrarium",
+            "model_providers": {
+                "terrarium": {
+                    "name": "terrarium",
+                    "base_url": os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+                    "env_key": "OPENAI_API_KEY",
+                },
+            },
+        }
+        self._workspace.fs.write_file(f"{TERRARIUM_DIR}/config.toml", tomli_w.dumps(config).encode())
 
     def _read_new_session_entries(self) -> tuple[list[Message], dict[str, int], str | None]:
         if self._session_file is None:
@@ -220,9 +230,6 @@ class CodexAgent(BaseAgent):
             f"OPENAI_API_KEY={shlex.quote(self._api_key)}",
             f"CODEX_HOME={TERRARIUM_DIR}",
         ]
-        base_url = os.environ.get("OPENAI_BASE_URL")
-        if base_url:
-            parts.append(f"OPENAI_BASE_URL={shlex.quote(base_url)}")
         return " ".join(parts) + " "
 
     def _build_subcommand(self) -> str:
