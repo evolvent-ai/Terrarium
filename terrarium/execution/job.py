@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from terrarium.dataset.dataset import Dataset
-from terrarium.execution.events import EventBus, JobEvent, JobEventPayload, TrialEvent
+from terrarium.execution.events import EventBus, JobEvent, JobEventPayload, JobFinishedPayload, JobStartedPayload, TrialEvent
 from terrarium.execution.queue import TrialQueue
 from terrarium.metrics.base import BaseMetric
 from terrarium.metrics.builtins import Mean
@@ -46,7 +46,11 @@ class Job:
 
         trial_configs = self._expand_trials(job_dir)
 
-        self._events.emit(JobEventPayload(event=JobEvent.STARTED, job_name=job_name))
+        self._events.emit(JobEventPayload(
+            event=JobEvent.STARTED,
+            job_name=job_name,
+            payload=JobStartedPayload(n_trials=len(trial_configs)),
+        ))
 
         queue = TrialQueue(
             n_concurrent=cfg.n_concurrent_trials,
@@ -62,7 +66,11 @@ class Job:
         )
         self._save_result(job_dir, job_result)
 
-        self._events.emit(JobEventPayload(event=JobEvent.FINISHED, job_name=job_name))
+        self._events.emit(JobEventPayload(
+            event=JobEvent.FINISHED,
+            job_name=job_name,
+            payload=JobFinishedPayload(),
+        ))
         return job_result
 
     def _save_config(self, job_dir: Path) -> None:

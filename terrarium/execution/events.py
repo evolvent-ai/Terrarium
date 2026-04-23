@@ -52,10 +52,19 @@ class TrialEventPayload(BaseModel):
     payload: TrialQueuedPayload | TrialStartedPayload | TrialSucceededPayload | TrialFailedPayload
 
 
+class JobStartedPayload(BaseModel):
+    n_trials: int
+
+
+class JobFinishedPayload(BaseModel):
+    pass
+
+
 class JobEventPayload(BaseModel):
     event: JobEvent
     job_name: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    payload: JobStartedPayload | JobFinishedPayload
 
 
 class EventBus:
