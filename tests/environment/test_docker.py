@@ -49,6 +49,20 @@ class TestDockerSandbox:
             "echo hello", demux=True, environment={"FOO": "1", "BAR": "x"},
         )
 
+    def test_exec_forwards_user(self):
+        sandbox = self._make_sandbox()
+        sandbox.exec("echo hello", user="root")
+        sandbox._container.exec_run.assert_called_once_with(
+            "echo hello", demux=True, environment=None, user="root",
+        )
+
+    def test_exec_forwards_user_int(self):
+        sandbox = self._make_sandbox()
+        sandbox.exec("echo hello", user=1000)
+        sandbox._container.exec_run.assert_called_once_with(
+            "echo hello", demux=True, environment=None, user="1000",
+        )
+
 
 class TestDockerSandboxProvider:
     def _make_client(self, image_cached: bool = False):
