@@ -13,6 +13,7 @@ import re
 import shlex
 from pathlib import Path
 
+import tomli_w
 from loguru import logger
 
 from terrarium.agent.base import BaseAgent
@@ -29,10 +30,8 @@ from terrarium.models.trajectory import (
 )
 
 DEFAULT_IMAGE = "terrarium/codex:latest"
-CODEX_HOME = "/root/.codex"
-SESSION_DIR = f"{CODEX_HOME}/sessions"
-AUTH_PATH = f"{CODEX_HOME}/auth.json"
-SKILLS_DIR = "/root/.agents/skills"
+TERRARIUM_DIR = "/terrarium/codex"
+SESSION_DIR = f"{TERRARIUM_DIR}/sessions"
 
 CODEX_INSTALL_SCRIPT = """\
 set -e
@@ -50,8 +49,9 @@ if ! command -v curl >/dev/null 2>&1; then
     fi
 fi
 
+export NVM_DIR=/opt/.nvm
+mkdir -p "$NVM_DIR"
 curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh | bash
-export NVM_DIR="$HOME/.nvm"
 . "$NVM_DIR/nvm.sh" || true
 command -v nvm >/dev/null || { echo "NVM failed to load" >&2; exit 1; }
 nvm install 22
@@ -104,9 +104,13 @@ class CodexAgent(BaseAgent):
 
     def setup(self, workspace, conn_info: dict) -> None:
         self._workspace = workspace
+        self._workspace.shell.exec(
+            f"mkdir -p {TERRARIUM_DIR} && chmod 1777 {TERRARIUM_DIR}",
+            user="root",
+        )
         self._ensure_installed()
         self._version = self._detect_version()
-        self._write_auth()
+        self._write_config()
         logger.info("Codex agent ready: version={}", self._version)
 
     def _ensure_installed(self) -> None:
@@ -114,7 +118,7 @@ class CodexAgent(BaseAgent):
         if check.exit_code == 0:
             return
         logger.info("Codex CLI not found in workspace, installing...")
-        result = self._workspace.shell.exec(CODEX_INSTALL_SCRIPT)
+        result = self._workspace.shell.exec(CODEX_INSTALL_SCRIPT, user="root")
         if result.exit_code != 0:
             raise RuntimeError(
                 f"Failed to install Codex CLI (exit {result.exit_code}): "
@@ -126,14 +130,14 @@ class CodexAgent(BaseAgent):
         if not path.is_dir():
             raise FileNotFoundError(f"Skill path is not a directory: {path}")
         skill_name = path.name
-        dest = f"{SKILLS_DIR}/{skill_name}"
-        self._workspace.fs.make_dir(SKILLS_DIR)
+        dest = f"{self.skills_dir}/{skill_name}"
+        self._workspace.fs.make_dir(self.skills_dir)
         self._workspace.fs.upload(str(path), dest)
         logger.info("Installed skill: {} -> {}", skill_name, dest)
 
     @property
     def skills_dir(self) -> str:
-        return SKILLS_DIR
+        return f"{TERRARIUM_DIR}/skills"
 
     def act(self, instruction: str) -> ActResult:
         command = self._build_command(instruction)
@@ -192,10 +196,18 @@ class CodexAgent(BaseAgent):
         match = re.search(r"(\d+\.\d+\.\d+)", result.stdout)
         return match.group(1) if match else result.stdout.strip()
 
-    def _write_auth(self) -> None:
-        auth = json.dumps({"OPENAI_API_KEY": self._api_key}).encode()
-        self._workspace.fs.make_dir(CODEX_HOME)
-        self._workspace.fs.write_file(AUTH_PATH, auth)
+    def _write_config(self) -> None:
+        config = {
+            "model_provider": "terrarium",
+            "model_providers": {
+                "terrarium": {
+                    "name": "terrarium",
+                    "base_url": os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+                    "env_key": "OPENAI_API_KEY",
+                },
+            },
+        }
+        self._workspace.fs.write_file(f"{TERRARIUM_DIR}/config.toml", tomli_w.dumps(config).encode())
 
     def _read_new_session_entries(self) -> tuple[list[Message], dict[str, int], str | None]:
         if self._session_file is None:
@@ -216,10 +228,8 @@ class CodexAgent(BaseAgent):
     def _build_env_vars(self) -> str:
         parts = [
             f"OPENAI_API_KEY={shlex.quote(self._api_key)}",
+            f"CODEX_HOME={TERRARIUM_DIR}",
         ]
-        base_url = os.environ.get("OPENAI_BASE_URL")
-        if base_url:
-            parts.append(f"OPENAI_BASE_URL={shlex.quote(base_url)}")
         return " ".join(parts) + " "
 
     def _build_subcommand(self) -> str:
