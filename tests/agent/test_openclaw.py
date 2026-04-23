@@ -3,9 +3,11 @@ import json
 
 import pytest
 from terrarium.agent.openclaw import (
-    OpenClawAgent, SESSION_DIR, SKILLS_DIR, _parse_session_message,
+    CONFIG_PATH, OpenClawAgent, SESSION_DIR, TERRARIUM_DIR, _parse_session_message,
 )
 from terrarium.models.trajectory import TextBlock, ToolUseBlock, ToolResultBlock
+
+SKILLS_DIR = f"{TERRARIUM_DIR}/workspace/skills"
 
 
 class _FakeExecResult:
@@ -45,10 +47,10 @@ class _FakeShell:
     def __init__(self, responses=None):
         self._responses = responses or []
         self._call_index = 0
-        self.commands: list[str] = []
+        self.commands: list[tuple[str, str | None]] = []
 
-    def exec(self, command, timeout=None):
-        self.commands.append(command)
+    def exec(self, command, timeout=None, env=None, user=None):
+        self.commands.append((command, user))
         if self._call_index < len(self._responses):
             result = self._responses[self._call_index]
             self._call_index += 1
@@ -72,11 +74,11 @@ def models_config(tmp_path):
 
 
 def _make_agent(models_config, shell_responses=None):
-    # setup() starts with `command -v openclaw` to decide whether to install;
-    # prepend a success so the install path is skipped in unit tests.
+    # setup() runs: mkdir TERRARIUM_DIR (root), command -v openclaw, (install?), --version
+    mkdir_result = _FakeExecResult(exit_code=0)
     install_check = _FakeExecResult(exit_code=0, stdout="/usr/local/bin/openclaw")
     extra = shell_responses or [_FakeExecResult(stdout="openclaw version 2026.4.1")]
-    workspace = _FakeWorkspace(shell_responses=[install_check, *extra])
+    workspace = _FakeWorkspace(shell_responses=[mkdir_result, install_check, *extra])
     agent = OpenClawAgent(models_config_path=models_config)
     agent._workspace = workspace
     return agent, workspace
@@ -151,10 +153,10 @@ class TestEnsureInstalled:
             _FakeExecResult(exit_code=0, stdout="/usr/local/bin/openclaw"),
         ])
         agent._ensure_installed()
-        assert agent._workspace.shell.commands == ["command -v openclaw"]
+        assert agent._workspace.shell.commands == [("command -v openclaw", None)]
 
-    def test_runs_install_when_missing(self, models_config):
-        """If `openclaw` is absent, the install script is executed."""
+    def test_runs_install_as_root_when_missing(self, models_config):
+        """If `openclaw` is absent, the install script is executed as root."""
         agent = OpenClawAgent(models_config_path=models_config)
         agent._workspace = _FakeWorkspace(shell_responses=[
             _FakeExecResult(exit_code=1),
@@ -163,8 +165,10 @@ class TestEnsureInstalled:
         agent._ensure_installed()
         cmds = agent._workspace.shell.commands
         assert len(cmds) == 2
-        assert cmds[0] == "command -v openclaw"
-        assert "openclaw.ai/install.sh" in cmds[1]
+        assert cmds[0] == ("command -v openclaw", None)
+        install_cmd, install_user = cmds[1]
+        assert "openclaw.ai/install.sh" in install_cmd
+        assert install_user == "root"
 
     def test_raises_when_install_fails(self, models_config):
         """RuntimeError is raised if the install script exits non-zero."""
@@ -178,8 +182,17 @@ class TestEnsureInstalled:
 
 
 class TestSetup:
+    def test_creates_terrarium_dir_as_root(self, models_config):
+        """setup() provisions TERRARIUM_DIR as root with permissive mode."""
+        agent, workspace = _make_agent(models_config)
+        agent.setup(workspace, {})
+        first_cmd, first_user = workspace.shell.commands[0]
+        assert TERRARIUM_DIR in first_cmd
+        assert "1777" in first_cmd
+        assert first_user == "root"
+
     def test_writes_config(self, tmp_path):
-        """Writes openclaw.json with models config and exec security."""
+        """Writes openclaw.json with models config, workspace, and exec security."""
         models_config = {
             "providers": {"mycloud": {"baseUrl": "https://api.example.com", "apiKey": "sk-test",
                           "api": "openai-completions", "models": [{"id": "m", "name": "M"}]}}
@@ -188,17 +201,30 @@ class TestSetup:
         config_file.write_text(json.dumps(models_config))
 
         workspace = _FakeWorkspace(shell_responses=[
+            _FakeExecResult(exit_code=0),                                   # mkdir + chmod
             _FakeExecResult(exit_code=0, stdout="/usr/local/bin/openclaw"),  # command -v openclaw
-            _FakeExecResult(stdout="openclaw version 2026.4.1"),
+            _FakeExecResult(stdout="openclaw version 2026.4.1"),             # --version
         ])
         agent = OpenClawAgent(model="mycloud/m", models_config_path=str(config_file))
         agent.setup(workspace, {})
 
-        config_writes = [c for c in workspace.fs.write_file_calls if "openclaw.json" in c[0]]
+        config_writes = [c for c in workspace.fs.write_file_calls if c[0] == CONFIG_PATH]
+        assert len(config_writes) == 1
         config = json.loads(config_writes[0][1])
         assert config["models"] == models_config
         assert config["agents"]["defaults"]["model"]["primary"] == "mycloud/m"
+        assert config["agents"]["defaults"]["workspace"] == f"{TERRARIUM_DIR}/workspace"
         assert config["tools"]["exec"]["security"] == "full"
+
+
+class TestBuildCommand:
+    def test_injects_state_and_config_env(self, models_config):
+        """_build_command prefixes env vars that point openclaw at TERRARIUM_DIR."""
+        agent = OpenClawAgent(models_config_path=models_config)
+        agent._session_id = "test-session"
+        cmd = agent._build_command("hi")
+        assert f"OPENCLAW_STATE_DIR={TERRARIUM_DIR}" in cmd
+        assert f"OPENCLAW_CONFIG_PATH={CONFIG_PATH}" in cmd
 
 
 class TestAct:
@@ -293,7 +319,7 @@ class TestAct:
 
 class TestInstallSkill:
     def test_uploads_directory(self, tmp_path, models_config):
-        """Uploads skill dir to ~/.openclaw/workspace/skills/<name>."""
+        """Uploads skill dir to <skills_dir>/<name>."""
         skill_dir = tmp_path / "my_skill"
         skill_dir.mkdir()
 
