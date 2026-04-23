@@ -78,3 +78,16 @@ class TestWorkspaceIntegration:
             )
             assert result.exit_code == 0
             assert result.stdout.strip() == "hello-world"
+
+    def test_shell_exec_user(self):
+        with ComposableEnvironment(["workspace"]) as env:
+            env.workspace.shell.exec("useradd --create-home agent", user="root")
+
+            default = env.workspace.shell.exec("id -un")
+            assert default.stdout.strip() == "root"
+
+            as_agent = env.workspace.shell.exec("id -un", user="agent")
+            assert as_agent.stdout.strip() == "agent"
+
+            as_root = env.workspace.shell.exec("id -un", user="root")
+            assert as_root.stdout.strip() == "root"
