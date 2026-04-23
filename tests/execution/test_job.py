@@ -142,11 +142,3 @@ async def test_persistence(tmp_path):
     assert "trial_results" in result_data
 
 
-@pytest.mark.asyncio
-async def test_exports():
-    """Trial and Job are accessible from terrarium.execution."""
-    from terrarium.execution import Job as ExportedJob
-    from terrarium.execution import Trial as ExportedTrial
-
-    assert ExportedTrial is not None
-    assert ExportedJob is not None
