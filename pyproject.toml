@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "dulingxiao", email = "lxdu0314@gmail.com" }
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.0.0",
     "loguru>=0.7.0",
