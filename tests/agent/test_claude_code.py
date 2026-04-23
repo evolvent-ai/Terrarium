@@ -1,6 +1,8 @@
 """Unit tests for ClaudeCodeAgent (no Docker required)."""
 import pytest
-from terrarium.agent.claude_code import SKILLS_DIR, ClaudeCodeAgent
+from terrarium.agent.claude_code import TERRARIUM_DIR, ClaudeCodeAgent
+
+SKILLS_DIR = f"{TERRARIUM_DIR}/skills"
 
 
 class _FakeExecResult:
@@ -26,10 +28,10 @@ class _FakeShell:
     def __init__(self, responses=None):
         self._responses = responses or []
         self._call_index = 0
-        self.commands: list[str] = []
+        self.commands: list[tuple[str, str | None]] = []
 
-    def exec(self, command, timeout=None):
-        self.commands.append(command)
+    def exec(self, command, timeout=None, env=None, user=None):
+        self.commands.append((command, user))
         if self._call_index < len(self._responses):
             result = self._responses[self._call_index]
             self._call_index += 1
@@ -56,10 +58,10 @@ class TestEnsureInstalled:
             _FakeExecResult(exit_code=0, stdout="/usr/local/bin/claude"),
         ])
         agent._ensure_installed()
-        assert agent._workspace.shell.commands == ["command -v claude"]
+        assert agent._workspace.shell.commands == [("command -v claude", None)]
 
-    def test_runs_install_when_missing(self):
-        """If `claude` is absent, the install script is executed."""
+    def test_runs_install_as_root_when_missing(self):
+        """If `claude` is absent, the install script is executed as root."""
         agent = _make_agent(shell_responses=[
             _FakeExecResult(exit_code=1),  # command -v claude → not found
             _FakeExecResult(exit_code=0),  # install succeeds
@@ -67,8 +69,10 @@ class TestEnsureInstalled:
         agent._ensure_installed()
         cmds = agent._workspace.shell.commands
         assert len(cmds) == 2
-        assert cmds[0] == "command -v claude"
-        assert "claude.ai/install.sh" in cmds[1]
+        assert cmds[0] == ("command -v claude", None)
+        install_cmd, install_user = cmds[1]
+        assert "claude.ai/install.sh" in install_cmd
+        assert install_user == "root"
 
     def test_raises_when_install_fails(self):
         """RuntimeError is raised if the install script exits non-zero."""
@@ -82,7 +86,7 @@ class TestEnsureInstalled:
 
 class TestInstallSkill:
     def test_uploads_directory(self, tmp_path):
-        """Uploads the skill dir to /root/.claude/skills/<name>."""
+        """Uploads the skill dir to <skills_dir>/<name>."""
         skill_dir = tmp_path / "db_helper"
         skill_dir.mkdir()
 
@@ -118,7 +122,7 @@ class TestInstallSkill:
             agent.install_skill(tmp_path / "SKILL.md")
 
     def test_multiple(self, tmp_path):
-        """Multiple install_skill calls all land in /root/.claude/skills."""
+        """Multiple install_skill calls all land under skills_dir."""
         (tmp_path / "a").mkdir()
         (tmp_path / "b").mkdir()
 
@@ -134,3 +138,18 @@ class TestSkillsDir:
     def test_returns_in_container_skills_path(self):
         """skills_dir property exposes the in-container skills path."""
         assert _make_agent().skills_dir == SKILLS_DIR
+
+
+class TestSetup:
+    def test_creates_terrarium_dir_as_root(self):
+        """setup() provisions TERRARIUM_DIR as root with permissive mode."""
+        agent = _make_agent(shell_responses=[
+            _FakeExecResult(exit_code=0),                    # mkdir + chmod
+            _FakeExecResult(exit_code=0, stdout="/usr/local/bin/claude"),  # command -v claude
+            _FakeExecResult(exit_code=0, stdout="2.1.118"),  # claude --version
+        ])
+        agent.setup(agent._workspace, {})
+        first_cmd, first_user = agent._workspace.shell.commands[0]
+        assert TERRARIUM_DIR in first_cmd
+        assert "1777" in first_cmd
+        assert first_user == "root"
