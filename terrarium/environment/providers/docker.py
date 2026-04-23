@@ -75,7 +75,11 @@ class DockerSandbox(Sandbox):
         tar_stream = io.BytesIO()
         with tarfile.open(fileobj=tar_stream, mode="w") as tar:
             arcname = posixpath.basename(sandbox_path)
-            tar.add(local_path, arcname=arcname)
+            tar.add(
+                local_path,
+                arcname=arcname,
+                filter=lambda ti: ti.replace(uid=0, gid=0, uname="", gname="", mtime=0),
+            )
         tar_stream.seek(0)
 
         dest_dir = posixpath.dirname(sandbox_path) or "/"
