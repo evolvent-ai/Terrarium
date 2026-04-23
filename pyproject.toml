@@ -3,7 +3,7 @@ name = "terrarium"
 version = "0.0.1"
 description = "Programmatic definition and execution of multi-stage, multi-turn agent tasks"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.0.0",
     "loguru>=0.7.0",
