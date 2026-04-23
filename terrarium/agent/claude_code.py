@@ -31,7 +31,7 @@ from terrarium.models.trajectory import (
 )
 
 DEFAULT_IMAGE = "terrarium/claude-code:latest"
-SKILLS_DIR = "/root/.claude/skills"
+TERRARIUM_DIR = "/terrarium/claude_code"
 
 CLAUDE_INSTALL_SCRIPT = """\
 set -e
@@ -49,7 +49,7 @@ if ! command -v curl >/dev/null 2>&1; then
     fi
 fi
 curl -fsSL https://claude.ai/install.sh | bash
-ln -sf "$HOME/.local/bin/claude" /usr/local/bin/claude
+cp "$HOME/.local/bin/claude" /usr/local/bin/claude
 """
 
 
@@ -90,6 +90,10 @@ class ClaudeCodeAgent(BaseAgent):
 
     def setup(self, workspace, conn_info: dict) -> None:
         self._workspace = workspace
+        self._workspace.shell.exec(
+            f"mkdir -p {TERRARIUM_DIR} && chmod 1777 {TERRARIUM_DIR}",
+            user="root",
+        )
         self._ensure_installed()
         self._version = self._detect_version()
         logger.info("Claude Code agent ready: version={}", self._version)
@@ -99,7 +103,7 @@ class ClaudeCodeAgent(BaseAgent):
         if check.exit_code == 0:
             return
         logger.info("Claude Code CLI not found in workspace, installing...")
-        result = self._workspace.shell.exec(CLAUDE_INSTALL_SCRIPT)
+        result = self._workspace.shell.exec(CLAUDE_INSTALL_SCRIPT, user="root")
         if result.exit_code != 0:
             raise RuntimeError(
                 f"Failed to install Claude Code CLI (exit {result.exit_code}): "
@@ -111,14 +115,14 @@ class ClaudeCodeAgent(BaseAgent):
         if not path.is_dir():
             raise FileNotFoundError(f"Skill path is not a directory: {path}")
         skill_name = path.name
-        dest = f"{SKILLS_DIR}/{skill_name}"
-        self._workspace.fs.make_dir(SKILLS_DIR)
+        dest = f"{self.skills_dir}/{skill_name}"
+        self._workspace.fs.make_dir(self.skills_dir)
         self._workspace.fs.upload(str(path), dest)
         logger.info("Installed skill: {} -> {}", skill_name, dest)
 
     @property
     def skills_dir(self) -> str:
-        return SKILLS_DIR
+        return f"{TERRARIUM_DIR}/skills"
 
     def act(self, instruction: str) -> ActResult:
         command = self._build_command(instruction)
@@ -188,6 +192,7 @@ class ClaudeCodeAgent(BaseAgent):
             f"ANTHROPIC_MODEL={shlex.quote(self._model)}",
             "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1",
             "IS_SANDBOX=1",
+            f"CLAUDE_CONFIG_DIR={TERRARIUM_DIR}",
         ]
         base_url = os.environ.get("ANTHROPIC_BASE_URL")
         if base_url:
