@@ -80,7 +80,6 @@ class TestWorkspaceIntegration:
             assert result.stdout.strip() == "hello-world"
 
     def test_shell_exec_user(self):
-        # Create a non-root user, then force an exec back to root via `user=`.
         with ComposableEnvironment(["workspace"]) as env:
             env.workspace.shell.exec("useradd --create-home agent", user="root")
 
