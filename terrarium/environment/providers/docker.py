@@ -78,7 +78,7 @@ class DockerSandbox(Sandbox):
             tar.add(
                 local_path,
                 arcname=arcname,
-                filter=lambda ti: ti.replace(uid=0, gid=0, uname="", gname=""),
+                filter=lambda ti: ti.replace(uid=0, gid=0, uname="", gname="", mtime=0),
             )
         tar_stream.seek(0)
 

@@ -79,6 +79,7 @@ class TestDockerSandbox:
                 assert member.gid == 0
                 assert member.uname == ""
                 assert member.gname == ""
+                assert member.mtime == 0
 
 
 class TestDockerSandboxProvider:
