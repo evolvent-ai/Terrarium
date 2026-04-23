@@ -1,3 +1,6 @@
+import io
+import tarfile
+
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -62,6 +65,20 @@ class TestDockerSandbox:
         sandbox._container.exec_run.assert_called_once_with(
             "echo hello", demux=True, environment=None, user="1000",
         )
+
+    def test_upload_strips_host_ownership(self, tmp_path):
+        (tmp_path / "script.sh").write_text("echo hi\n")
+        sandbox = self._make_sandbox()
+        sandbox.upload(str(tmp_path / "script.sh"), "/app/script.sh")
+
+        dest_dir, tar_stream = sandbox._container.put_archive.call_args.args
+        assert dest_dir == "/app"
+        with tarfile.open(fileobj=io.BytesIO(tar_stream.getvalue()), mode="r") as tar:
+            for member in tar.getmembers():
+                assert member.uid == 0
+                assert member.gid == 0
+                assert member.uname == ""
+                assert member.gname == ""
 
 
 class TestDockerSandboxProvider:
