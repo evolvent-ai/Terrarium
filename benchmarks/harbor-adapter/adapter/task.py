@@ -33,9 +33,15 @@ def harbor_task(env, agent, *, task_dir: str):
 
     agent.act(instruction)
 
-    env.workspace.shell.exec("mkdir -p /logs/verifier")
-    verifier_env = _resolve_env_vars(cfg.get("verifier", {}).get("env", {}))
-    env.workspace.shell.exec("bash /tests/test.sh", env=verifier_env)
+    verifier_cfg = cfg.get("verifier", {})
+    verifier_user = verifier_cfg.get("user")
+    verifier_env = _resolve_env_vars(verifier_cfg.get("env", {}))
+
+    env.workspace.shell.exec(
+        "mkdir -p /logs/verifier && chmod 1777 /logs/verifier",
+        user="root",
+    )
+    env.workspace.shell.exec("bash /tests/test.sh", env=verifier_env, user=verifier_user)
 
     return CheckerResults(checks=[], score=_read_reward(env.workspace))
 
@@ -121,9 +127,8 @@ def params():
         for field in ("timeout_sec", "user"):
             if field in cfg.get("agent", {}):
                 logger.warning("[harbor:{}] ignoring [agent].{}", task_name, field)
-        for field in ("timeout_sec", "user"):
-            if field in cfg.get("verifier", {}):
-                logger.warning("[harbor:{}] ignoring [verifier].{}", task_name, field)
+        if "timeout_sec" in cfg.get("verifier", {}):
+            logger.warning("[harbor:{}] ignoring [verifier].timeout_sec", task_name)
         if "solution" in cfg or (td / "solution").exists():
             logger.warning("[harbor:{}] ignoring [solution]", task_name)
 
