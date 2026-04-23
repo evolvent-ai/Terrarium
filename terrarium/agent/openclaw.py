@@ -29,8 +29,9 @@ from terrarium.models.trajectory import (
 )
 
 DEFAULT_IMAGE = "terrarium/openclaw:latest"
-SESSION_DIR = "/root/.openclaw/agents/main/sessions"
-SKILLS_DIR = "/root/.openclaw/workspace/skills"
+TERRARIUM_DIR = "/terrarium/openclaw"
+SESSION_DIR = f"{TERRARIUM_DIR}/agents/main/sessions"
+CONFIG_PATH = f"{TERRARIUM_DIR}/openclaw.json"
 
 OPENCLAW_INSTALL_SCRIPT = """\
 set -e
@@ -85,6 +86,10 @@ class OpenClawAgent(BaseAgent):
 
     def setup(self, workspace, conn_info: dict) -> None:
         self._workspace = workspace
+        self._workspace.shell.exec(
+            f"mkdir -p {TERRARIUM_DIR} && chmod 1777 {TERRARIUM_DIR}",
+            user="root",
+        )
         self._ensure_installed()
         self._version = self._detect_version()
         self._write_config()
@@ -96,7 +101,7 @@ class OpenClawAgent(BaseAgent):
         if check.exit_code == 0:
             return
         logger.info("OpenClaw CLI not found in workspace, installing...")
-        result = self._workspace.shell.exec(OPENCLAW_INSTALL_SCRIPT)
+        result = self._workspace.shell.exec(OPENCLAW_INSTALL_SCRIPT, user="root")
         if result.exit_code != 0:
             raise RuntimeError(
                 f"Failed to install OpenClaw CLI (exit {result.exit_code}): "
@@ -104,19 +109,19 @@ class OpenClawAgent(BaseAgent):
             )
 
     def install_skill(self, path: str | Path) -> None:
-        """Install a skill into the agent. Uploads to ~/.openclaw/workspace/skills/."""
+        """Install a skill into the agent. Uploads to <skills_dir>/<name>."""
         path = Path(path).resolve()
         if not path.is_dir():
             raise FileNotFoundError(f"Skill path is not a directory: {path}")
         skill_name = path.name
-        dest = f"{SKILLS_DIR}/{skill_name}"
-        self._workspace.fs.make_dir(SKILLS_DIR)
+        dest = f"{self.skills_dir}/{skill_name}"
+        self._workspace.fs.make_dir(self.skills_dir)
         self._workspace.fs.upload(str(path), dest)
         logger.info("Installed skill: {} -> {}", skill_name, dest)
 
     @property
     def skills_dir(self) -> str:
-        return SKILLS_DIR
+        return f"{TERRARIUM_DIR}/workspace/skills"
 
     def act(self, instruction: str) -> ActResult:
         command = self._build_command(instruction)
@@ -181,7 +186,7 @@ class OpenClawAgent(BaseAgent):
         config = {
             "agents": {
                 "defaults": {
-                    "workspace": "/root/workspace",
+                    "workspace": f"{TERRARIUM_DIR}/workspace",
                     "model": {"primary": self._model},
                 },
             },
@@ -193,16 +198,12 @@ class OpenClawAgent(BaseAgent):
             },
         }
         config["models"] = self._models_config
-
-        config_dir = "/root/.openclaw"
-        self._workspace.fs.make_dir(config_dir)
-        self._workspace.fs.write_file(
-            f"{config_dir}/openclaw.json",
-            json.dumps(config, indent=2).encode(),
-        )
+        self._workspace.fs.write_file(CONFIG_PATH, json.dumps(config, indent=2).encode())
 
     def _build_command(self, instruction: str) -> str:
         parts = [
+            f"OPENCLAW_STATE_DIR={shlex.quote(TERRARIUM_DIR)}",
+            f"OPENCLAW_CONFIG_PATH={shlex.quote(CONFIG_PATH)}",
             "openclaw", "agent",
             "--local",
             "--json",
