@@ -93,7 +93,7 @@ class _ProgressUI:
         self._main.update(self._main_task, description=self._description(), advance=1)
 
     def _description(self) -> str:
-        return f"Trials [green]✓{self._succeeded:<3}[/][red]✗{self._failed:<3}[/]"
+        return f"Trials [green]✓{self._succeeded:<3}[/] [red]✗{self._failed:<3}[/]"
 
     def __enter__(self) -> _ProgressUI:
         logger.remove()
