@@ -32,6 +32,10 @@ def create_agent(config: AgentConfig) -> BaseAgent:
             f"Agent '{config.name}' not found. "
             f"Set import_path or use a built-in: {list(_AGENTS.keys())}"
         )
+
+    if not issubclass(agent_cls, BaseAgent):
+        raise TypeError(f"{agent_cls!r} is not a BaseAgent subclass")
+
     kwargs = dict(config.kwargs)
     if config.model_name:
         kwargs.setdefault("model", config.model_name)
