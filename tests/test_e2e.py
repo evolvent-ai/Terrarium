@@ -2,7 +2,8 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from terrarium import Job, JobConfig, AgentConfig, JobResult, Trial
+from terrarium import AgentConfig, Job, JobConfig, JobResult, Trial
+from terrarium.execution.events import JobEvent, TrialEvent
 from terrarium.models.config import TaskConfig, TrialConfig
 from terrarium.models.result import TrialResult
 
@@ -70,3 +71,30 @@ class TestJobEndToEnd:
         metrics = result.stats.agent_dataset_stats[key].metrics
         assert "mean" in metrics
         assert "max" in metrics
+
+
+class TestEventFlow:
+    async def test_successful_job_emits_full_event_sequence(self, tmp_path):
+        """A successful single-trial job emits job_started -> trial {queued, started, succeeded} -> job_finished."""
+        config = JobConfig(
+            agents=[AgentConfig(name="mock", import_path="tests.agent.mock:MockAgent")],
+            tasks=[str(FIXTURES_DIR / "sample_task")],
+            job_dir=tmp_path,
+        )
+        job = Job(config)
+        sequence: list[str] = []
+        for evt in TrialEvent:
+            job.on(evt, lambda p, e=evt: sequence.append(f"trial_{e.value}"))
+        for evt in JobEvent:
+            job.on(evt, lambda p, e=evt: sequence.append(f"job_{e.value}"))
+
+        with _patch_cr():
+            await job.run()
+
+        assert sequence == [
+            "job_started",
+            "trial_queued",
+            "trial_started",
+            "trial_succeeded",
+            "job_finished",
+        ]

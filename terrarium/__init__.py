@@ -26,6 +26,7 @@ from terrarium.dataset.dataset import Dataset
 # Execution
 from terrarium.execution.trial import Trial
 from terrarium.execution.job import Job
+from terrarium.execution.events import EventBus, JobEvent, JobEventPayload, TrialEvent, TrialEventPayload
 # Metrics
 from terrarium.metrics.base import BaseMetric
 from terrarium.metrics.builtins import Mean, Max, Min, Sum, PassAtK
@@ -42,5 +43,6 @@ __all__ = [
     "entry", "run_checkers", "aggregate_results", "Task",
     "Dataset",
     "Trial", "Job",
+    "EventBus", "TrialEvent", "JobEvent", "TrialEventPayload", "JobEventPayload",
     "BaseMetric", "Mean", "Max", "Min", "Sum", "PassAtK", "create_metric",
 ]

@@ -3,10 +3,13 @@ from __future__ import annotations
 
 import shutil
 from collections import defaultdict
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from terrarium.dataset.dataset import Dataset
+from terrarium.execution.events import EventBus, JobEvent, JobEventPayload, JobFinishedPayload, JobStartedPayload, TrialEvent
 from terrarium.execution.queue import TrialQueue
 from terrarium.metrics.base import BaseMetric
 from terrarium.metrics.builtins import Mean
@@ -25,6 +28,11 @@ class Job:
     def __init__(self, config: JobConfig) -> None:
         self._config = config
         self._datasets: dict[str, Dataset] = {}
+        self._events = EventBus()
+
+    def on(self, event: TrialEvent | JobEvent, handler: Callable[[Any], None]) -> Job:
+        self._events.subscribe(event, handler)
+        return self
 
     async def run(self) -> JobResult:
         cfg = self._config
@@ -38,9 +46,16 @@ class Job:
 
         trial_configs = self._expand_trials(job_dir)
 
+        self._events.emit(JobEventPayload(
+            event=JobEvent.STARTED,
+            job_name=job_name,
+            payload=JobStartedPayload(n_trials=len(trial_configs)),
+        ))
+
         queue = TrialQueue(
             n_concurrent=cfg.n_concurrent_trials,
             retry_config=cfg.retry,
+            events=self._events,
         )
         trial_results = await queue.run(trial_configs)
 
@@ -50,9 +65,13 @@ class Job:
             timing=TimingInfo(started_at=started_at, finished_at=datetime.now(timezone.utc)),
         )
         self._save_result(job_dir, job_result)
-        return job_result
 
-    # ── Private helpers ──────────────────────────────────────────
+        self._events.emit(JobEventPayload(
+            event=JobEvent.FINISHED,
+            job_name=job_name,
+            payload=JobFinishedPayload(),
+        ))
+        return job_result
 
     def _save_config(self, job_dir: Path) -> None:
         job_dir.mkdir(parents=True, exist_ok=True)
@@ -62,7 +81,6 @@ class Job:
         (job_dir / "result.json").write_text(result.model_dump_json(indent=2))
 
     def _expand_trials(self, job_dir: Path) -> list[TrialConfig]:
-        """Resolve tasks from datasets + adhoc paths, then expand into TrialConfigs."""
         task_entries = self._resolve_tasks()
         cfg = self._config
         configs: list[TrialConfig] = []
@@ -85,7 +103,6 @@ class Job:
         return configs
 
     def _resolve_tasks(self) -> list[tuple[Task, str]]:
-        """Discover tasks from datasets and adhoc paths. Populates _datasets."""
         entries: list[tuple[Task, str]] = []
 
         for ds_path in self._config.datasets:
@@ -101,7 +118,6 @@ class Job:
         return entries
 
     def _build_stats(self, trial_results: list[TrialResult]) -> JobStats:
-        """Aggregate trial results grouped by agent__model__source."""
         groups = self._group_results(trial_results)
         stats = JobStats(n_trials=len(trial_results))
 
