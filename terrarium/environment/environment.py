@@ -6,7 +6,7 @@ from loguru import logger
 
 from terrarium.environment.capability import BaseCapability
 from terrarium.environment.exceptions import CapabilityNotFoundError
-from terrarium.environment.capabilities import get_capability_class
+from terrarium.environment.capabilities import resolve_capability_class
 from terrarium.environment.sandbox import SandboxProvider
 
 
@@ -76,11 +76,14 @@ class ComposableEnvironment:
         parsed = {_parse_spec(s) for s in self._capability_specs}
         config = {_parse_spec(k): v for k, v in self._config.items()}
 
-        capability_classes = {t: get_capability_class(t) for t, _ in parsed}
+        capability_classes = {
+            (t, i): resolve_capability_class(t, config.get((t, i)))
+            for t, i in parsed
+        }
 
         # Lazy provider init: only if at least one instance needs a sandbox.
         needs_provider = any(
-            capability_classes[t].sandbox_spec(config.get((t, i), {})) is not None
+            capability_classes[(t, i)].sandbox_spec(config.get((t, i))) is not None
             for t, i in parsed
         )
         if needs_provider:
@@ -97,8 +100,8 @@ class ComposableEnvironment:
         try:
             # Phase 1: start all non-workspace capabilities
             for type_name, instance_name in non_workspace_specs:
-                cls = capability_classes[type_name]
-                cap_config = config.get((type_name, instance_name), {})
+                cls = capability_classes[(type_name, instance_name)]
+                cap_config = config.get((type_name, instance_name))
                 sandbox_spec = cls.sandbox_spec(cap_config)
 
                 if sandbox_spec:
@@ -119,8 +122,8 @@ class ComposableEnvironment:
             secrets_env, secrets_file = self._collect_secrets(self._capabilities)
 
             for type_name, instance_name in workspace_specs:
-                cls = capability_classes[type_name]
-                cap_config = config.get((type_name, instance_name), {})
+                cls = capability_classes[(type_name, instance_name)]
+                cap_config = config.get((type_name, instance_name))
                 sandbox_spec = cls.sandbox_spec(cap_config)
 
                 if sandbox_spec:
@@ -193,8 +196,8 @@ class ComposableEnvironment:
                 f"Capability instance already exists: {type_name}:{instance_name}"
             )
 
-        cls = get_capability_class(type_name)
         cap_config = config or {}
+        cls = resolve_capability_class(type_name, cap_config)
         sandbox_spec = cls.sandbox_spec(cap_config)
 
         if sandbox_spec:
