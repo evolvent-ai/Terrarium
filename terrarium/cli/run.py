@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import sys
 import tomllib
@@ -10,10 +12,12 @@ from loguru import logger
 from rich.console import Group
 from rich.live import Live
 from rich.panel import Panel
+from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TaskID, TextColumn, TimeElapsedColumn, TimeRemainingColumn
 from rich.table import Table
 from rich.text import Text
 
 from terrarium.cli.utils import console, print_error
+from terrarium.execution.events import JobEvent, JobEventPayload, TrialEvent, TrialEventPayload
 from terrarium.execution.job import Job
 from terrarium.models.config import JobConfig
 
@@ -33,6 +37,79 @@ class _LogPanel:
         else:
             text = Text("Waiting...", style="dim")
         return Panel(text, title="Execution Log", title_align="left", border_style="yellow")
+
+
+class _ProgressUI:
+    """Live progress display wired to Job lifecycle events."""
+
+    def __init__(self, job: Job) -> None:
+        self._succeeded = 0
+        self._failed = 0
+        self._main = Progress(
+            TextColumn("[bold]{task.description}"),
+            BarColumn(bar_width=None, style="grey30", complete_style="magenta", finished_style="magenta"),
+            MofNCompleteColumn(),
+            TextColumn("[dim]ELAPSED[/]"),
+            TimeElapsedColumn(),
+            TextColumn("[dim]ETA[/]"),
+            TimeRemainingColumn(),
+        )
+        self._main_task = self._main.add_task(self._description(), total=0, start=False)
+        self._running = Progress(SpinnerColumn(), TextColumn("{task.description}"))
+        self._running_tasks: dict[str, TaskID] = {}
+        self._log_panel = _LogPanel()
+
+        job.on(JobEvent.STARTED, self._on_job_started)
+        job.on(TrialEvent.STARTED, self._on_trial_started)
+        job.on(TrialEvent.SUCCEEDED, self._on_trial_finished)
+        job.on(TrialEvent.FAILED, self._on_trial_finished)
+
+    def __rich__(self) -> Group:
+        return Group(
+            Panel(
+                Group(self._main, self._running),
+                title="Progress",
+                title_align="left",
+                border_style="magenta",
+            ),
+            self._log_panel,
+        )
+
+    def _on_job_started(self, p: JobEventPayload) -> None:
+        self._main.update(self._main_task, total=p.payload.n_trials)
+        self._main.start_task(self._main_task)
+
+    def _on_trial_started(self, p: TrialEventPayload) -> None:
+        self._running_tasks[p.trial_name] = self._running.add_task(p.trial_name)
+
+    def _on_trial_finished(self, p: TrialEventPayload) -> None:
+        if p.event == TrialEvent.SUCCEEDED:
+            self._succeeded += 1
+        else:
+            self._failed += 1
+        tid = self._running_tasks.pop(p.trial_name, None)
+        if tid is not None:
+            self._running.remove_task(tid)
+        self._main.update(self._main_task, description=self._description(), advance=1)
+
+    def _description(self) -> str:
+        return f"Trials [green]✓{self._succeeded:<3}[/][red]✗{self._failed:<3}[/]"
+
+    def __enter__(self) -> _ProgressUI:
+        logger.remove()
+        self._sink_id = logger.add(
+            lambda msg: self._log_panel.add(msg.strip()),
+            format="{time:HH:mm:ss} | {level:<7} | {message}",
+            level="INFO",
+        )
+        self._live = Live(self, console=console, refresh_per_second=10)
+        self._live.__enter__()
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self._live.__exit__(*exc)
+        logger.remove(self._sink_id)
+        logger.add(sys.stderr)
 
 
 def run_command(
@@ -63,16 +140,10 @@ def run_command(
     info.add_row("Concurrent", str(job_config.n_concurrent_trials))
     console.print(Panel(info, title="Terrarium Run", title_align="left", border_style="blue"))
 
-    # Execute with live log panel
-    log_panel = _LogPanel()
-    logger.remove()
-    logger.add(lambda msg: log_panel.add(msg.strip()), format="{time:HH:mm:ss} | {level:<7} | {message}", level="INFO")
-    try:
-        with Live(log_panel, console=console, refresh_per_second=4):
-            job_result = asyncio.run(Job(job_config).run())
-    finally:
-        logger.remove()
-        logger.add(sys.stderr)
+    # Run with live progress UI
+    job = Job(job_config)
+    with _ProgressUI(job):
+        job_result = asyncio.run(job.run())
 
     # Results table
     table = Table(show_header=True, header_style="bold", box=None, padding=(0, 2), pad_edge=False, expand=True)

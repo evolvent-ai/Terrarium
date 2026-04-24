@@ -5,8 +5,7 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
+from terrarium.execution.events import JobEvent, JobEventPayload, TrialEvent, TrialEventPayload
 from terrarium.execution.job import Job
 from terrarium.models.config import AgentConfig, JobConfig
 
@@ -29,7 +28,6 @@ def _make_mock_rt():
     return mock_rt
 
 
-@pytest.mark.asyncio
 async def test_single_task(tmp_path):
     """1 agent x 1 task -> 1 trial result."""
     cfg = JobConfig(
@@ -45,7 +43,6 @@ async def test_single_task(tmp_path):
     assert result.stats.n_trials == 1
 
 
-@pytest.mark.asyncio
 async def test_dataset(tmp_path):
     """1 agent x sample_dataset (2 tasks) -> 2 trials, stats key includes agent and dataset."""
     cfg = JobConfig(
@@ -68,7 +65,6 @@ async def test_dataset(tmp_path):
     assert "sample_dataset" in key
 
 
-@pytest.mark.asyncio
 async def test_n_attempts(tmp_path):
     """n_attempts=3 produces 3 trials for one task."""
     cfg = JobConfig(
@@ -85,7 +81,6 @@ async def test_n_attempts(tmp_path):
     assert result.stats.n_trials == 3
 
 
-@pytest.mark.asyncio
 async def test_dataset_metrics(tmp_path):
     """Dataset-level metrics (mean, max from dataset.toml) are used in stats."""
     cfg = JobConfig(
@@ -103,7 +98,6 @@ async def test_dataset_metrics(tmp_path):
         assert "max" in group_stats.metrics
 
 
-@pytest.mark.asyncio
 async def test_adhoc_default_metrics(tmp_path):
     """Adhoc tasks (no dataset) get default Mean metric."""
     cfg = JobConfig(
@@ -119,7 +113,6 @@ async def test_adhoc_default_metrics(tmp_path):
         assert "mean" in group_stats.metrics
 
 
-@pytest.mark.asyncio
 async def test_persistence(tmp_path):
     """job_dir contains config.json and result.json."""
     job_dir = tmp_path / "my_job"
@@ -142,11 +135,74 @@ async def test_persistence(tmp_path):
     assert "trial_results" in result_data
 
 
-@pytest.mark.asyncio
-async def test_exports():
-    """Trial and Job are accessible from terrarium.execution."""
-    from terrarium.execution import Job as ExportedJob
-    from terrarium.execution import Trial as ExportedTrial
+async def test_on_registers_trial_event_handler(tmp_path):
+    """job.on(TrialEvent.SUCCEEDED, handler) fires when a trial succeeds."""
+    cfg = JobConfig(
+        agents=[_mock_agent_cfg()],
+        tasks=[str(SAMPLE_TASK_DIR)],
+        job_dir=tmp_path,
+    )
+    job = Job(cfg)
+    received: list[TrialEventPayload] = []
+    job.on(TrialEvent.SUCCEEDED, received.append)
 
-    assert ExportedTrial is not None
-    assert ExportedJob is not None
+    mock_rt = _make_mock_rt()
+    with patch("terrarium.execution.trial.ComposableEnvironment", return_value=mock_rt):
+        await job.run()
+
+    assert len(received) == 1
+    assert received[0].payload.result.checker_result.score == 1.0
+
+
+async def test_on_returns_self_for_chaining(tmp_path):
+    """job.on(...) returns the job so subscribers can chain."""
+    cfg = JobConfig(
+        agents=[_mock_agent_cfg()],
+        tasks=[str(SAMPLE_TASK_DIR)],
+        job_dir=tmp_path,
+    )
+    job = Job(cfg)
+    assert job.on(TrialEvent.SUCCEEDED, lambda p: None) is job
+
+
+async def test_job_started_event_carries_n_trials(tmp_path):
+    """JobStartedPayload exposes the total trial count for UI sizing."""
+    cfg = JobConfig(
+        agents=[_mock_agent_cfg()],
+        tasks=[str(SAMPLE_TASK_DIR)],
+        n_attempts=3,
+        job_dir=tmp_path,
+    )
+    job = Job(cfg)
+    received: list[JobEventPayload] = []
+    job.on(JobEvent.STARTED, received.append)
+
+    mock_rt = _make_mock_rt()
+    with patch("terrarium.execution.trial.ComposableEnvironment", return_value=mock_rt):
+        await job.run()
+
+    assert len(received) == 1
+    assert received[0].payload.n_trials == 3
+
+
+async def test_job_events_bookend_trial_events(tmp_path):
+    """JobEvent.STARTED fires before any trial event; FINISHED fires last."""
+    cfg = JobConfig(
+        agents=[_mock_agent_cfg()],
+        tasks=[str(SAMPLE_TASK_DIR)],
+        job_dir=tmp_path,
+    )
+    job = Job(cfg)
+    sequence: list[str] = []
+    for evt in (JobEvent.STARTED, JobEvent.FINISHED):
+        job.on(evt, lambda p, e=evt: sequence.append(f"job_{e.value}"))
+    for evt in TrialEvent:
+        job.on(evt, lambda p, e=evt: sequence.append(f"trial_{e.value}"))
+
+    mock_rt = _make_mock_rt()
+    with patch("terrarium.execution.trial.ComposableEnvironment", return_value=mock_rt):
+        await job.run()
+
+    assert sequence[0] == "job_started"
+    assert sequence[-1] == "job_finished"
+    assert sequence[1:-1] == ["trial_queued", "trial_started", "trial_succeeded"]
