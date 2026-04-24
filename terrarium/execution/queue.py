@@ -5,6 +5,7 @@ import asyncio
 
 from loguru import logger
 
+from terrarium.execution.events import EventBus, TrialEvent, TrialEventPayload, TrialFailedPayload, TrialQueuedPayload, TrialStartedPayload, TrialSucceededPayload
 from terrarium.execution.trial import Trial
 from terrarium.models.config import RetryConfig, TrialConfig
 from terrarium.models.result import TrialResult
@@ -15,9 +16,11 @@ class TrialQueue:
 
     def __init__(
         self,
+        events: EventBus,
         n_concurrent: int = 4,
         retry_config: RetryConfig | None = None,
     ) -> None:
+        self._events = events
         self._n_concurrent = n_concurrent
         self._retry_config = retry_config or RetryConfig()
 
@@ -36,10 +39,25 @@ class TrialQueue:
         retry_config = self._retry_config
 
         for attempt in range(retry_config.max_retries + 1):
+            self._events.emit(TrialEventPayload(
+                event=TrialEvent.QUEUED,
+                trial_name=trial_config.trial_name,
+                payload=TrialQueuedPayload(),
+            ))
             async with semaphore:
+                self._events.emit(TrialEventPayload(
+                    event=TrialEvent.STARTED,
+                    trial_name=trial_config.trial_name,
+                    payload=TrialStartedPayload(),
+                ))
                 result = await Trial(trial_config).run()
 
             if result.exception_info is None:
+                self._events.emit(TrialEventPayload(
+                    event=TrialEvent.SUCCEEDED,
+                    trial_name=trial_config.trial_name,
+                    payload=TrialSucceededPayload(result=result),
+                ))
                 return result
 
             if attempt < retry_config.max_retries:
@@ -57,4 +75,9 @@ class TrialQueue:
             "Trial '{}' failed after {} attempt(s): {}",
             trial_config.trial_name, retry_config.max_retries + 1, result.exception_info.exception_message,
         )
+        self._events.emit(TrialEventPayload(
+            event=TrialEvent.FAILED,
+            trial_name=trial_config.trial_name,
+            payload=TrialFailedPayload(result=result, exception=result.exception_info),
+        ))
         return result
