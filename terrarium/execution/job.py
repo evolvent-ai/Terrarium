@@ -89,7 +89,7 @@ class Job:
             for task, source in task_entries:
                 for attempt_idx in range(cfg.n_attempts):
                     model_name = agent_cfg.model_name or ""
-                    trial_name = f"{agent_cfg.name}__{model_name}__{source}__{task.name}"
+                    trial_name = f"{agent_cfg.name}__{model_name.replace('/', '_')}__{source}__{task.name}"
                     if cfg.n_attempts > 1:
                         trial_name += f"__attempt{attempt_idx}"
                     configs.append(TrialConfig(
