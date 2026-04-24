@@ -187,9 +187,9 @@ def test_multi_instance_teardown_called_for_each():
         del _REGISTRY["tracking"]
 
 
-def test_unknown_capability_type_raises_on_start():
+def test_unknown_capability_type_raises_valueerror_on_start():
     env = ComposableEnvironment(["fake_nonexistent"])
-    with pytest.raises(CapabilityNotFoundError, match="fake_nonexistent"):
+    with pytest.raises(ValueError, match="fake_nonexistent"):
         env.start()
 
 

@@ -37,7 +37,7 @@ def test_runtime_context_manager(mock_psycopg2):
 def test_runtime_invalid_capability():
     provider = _mock_provider()
     env = ComposableEnvironment(["redis"], provider=provider)
-    with pytest.raises(CapabilityNotFoundError, match="redis"):
+    with pytest.raises(ValueError, match="redis"):
         env.start()
 
 
