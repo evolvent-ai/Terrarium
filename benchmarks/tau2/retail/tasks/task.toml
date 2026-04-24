@@ -1,0 +1,7 @@
+[metadata]
+name = "retail_task"
+author = "tau2-bench"
+difficulty = "hard"
+category = "retail"
+tags = ["tau2", "retail"]
+description = "tau2-bench retail scenarios (parameterized — one instance per entry in data/tasks.json)"
