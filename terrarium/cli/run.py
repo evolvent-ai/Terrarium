@@ -12,7 +12,7 @@ from loguru import logger
 from rich.console import Group
 from rich.live import Live
 from rich.panel import Panel
-from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TaskID, TextColumn, TimeElapsedColumn
+from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TaskID, TextColumn, TimeElapsedColumn, TimeRemainingColumn
 from rich.table import Table
 from rich.text import Text
 
@@ -43,13 +43,18 @@ class _ProgressUI:
     """Live progress display wired to Job lifecycle events."""
 
     def __init__(self, job: Job) -> None:
+        self._succeeded = 0
+        self._failed = 0
         self._main = Progress(
             TextColumn("[bold]{task.description}"),
-            BarColumn(),
+            BarColumn(bar_width=None, style="grey30", complete_style="magenta", finished_style="magenta"),
             MofNCompleteColumn(),
+            TextColumn("[dim]ELAPSED[/]"),
             TimeElapsedColumn(),
+            TextColumn("[dim]ETA[/]"),
+            TimeRemainingColumn(),
         )
-        self._main_task = self._main.add_task("Trials", total=0, start=False)
+        self._main_task = self._main.add_task(self._description(), total=0, start=False)
         self._running = Progress(SpinnerColumn(), TextColumn("{task.description}"))
         self._running_tasks: dict[str, TaskID] = {}
         self._log_panel = _LogPanel()
@@ -78,10 +83,17 @@ class _ProgressUI:
         self._running_tasks[p.trial_name] = self._running.add_task(p.trial_name)
 
     def _on_trial_finished(self, p: TrialEventPayload) -> None:
+        if p.event == TrialEvent.SUCCEEDED:
+            self._succeeded += 1
+        else:
+            self._failed += 1
         tid = self._running_tasks.pop(p.trial_name, None)
         if tid is not None:
             self._running.remove_task(tid)
-        self._main.advance(self._main_task)
+        self._main.update(self._main_task, description=self._description(), advance=1)
+
+    def _description(self) -> str:
+        return f"Trials [green]✓{self._succeeded:<3}[/][red]✗{self._failed:<3}[/]"
 
     def __enter__(self) -> _ProgressUI:
         logger.remove()
