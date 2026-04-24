@@ -14,7 +14,7 @@ from terrarium.models.common import ExceptionInfo
 from terrarium.models.result import TrialResult
 
 
-class TrialEvent(str, Enum):
+class TrialEvent(Enum):
     """Lifecycle events for a single trial."""
     QUEUED = "queued"
     STARTED = "started"
@@ -22,7 +22,7 @@ class TrialEvent(str, Enum):
     FAILED = "failed"
 
 
-class JobEvent(str, Enum):
+class JobEvent(Enum):
     """Lifecycle events for a job run."""
     STARTED = "started"
     FINISHED = "finished"

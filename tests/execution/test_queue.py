@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from terrarium.execution.events import EventBus
+from terrarium.execution.events import EventBus, TrialEvent, TrialEventPayload
 from terrarium.execution.queue import TrialQueue
 from terrarium.models.config import AgentConfig, RetryConfig, TaskConfig, TrialConfig
 
@@ -88,3 +88,88 @@ async def test_no_retry_on_max_retries_zero():
     assert len(results) == 1
     assert results[0].exception_info is not None
     assert results[0].exception_info.exception_type == "RuntimeError"
+
+
+async def test_success_event_sequence():
+    """Successful trial emits QUEUED -> STARTED -> SUCCEEDED."""
+    bus = EventBus()
+    events: list[tuple[TrialEvent, str]] = []
+    for evt in TrialEvent:
+        bus.subscribe(evt, lambda p, e=evt: events.append((e, p.trial_name)))
+
+    mock_rt = _make_mock_rt()
+    with patch("terrarium.execution.trial.ComposableEnvironment", return_value=mock_rt):
+        await TrialQueue(bus, n_concurrent=1).run([_make_config("t1")])
+
+    assert events == [
+        (TrialEvent.QUEUED, "t1"),
+        (TrialEvent.STARTED, "t1"),
+        (TrialEvent.SUCCEEDED, "t1"),
+    ]
+
+
+async def test_retry_emits_extra_queued_started_pair():
+    """A retried trial emits an additional QUEUED -> STARTED between attempts."""
+    bus = EventBus()
+    sequence: list[TrialEvent] = []
+    for evt in TrialEvent:
+        bus.subscribe(evt, lambda p, e=evt: sequence.append(e))
+
+    call_count = 0
+
+    def failing_then_ok(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            m = MagicMock()
+            m.start = MagicMock(side_effect=RuntimeError("transient"))
+            m.stop = MagicMock()
+            return m
+        return _make_mock_rt()
+
+    retry = RetryConfig(max_retries=1, min_wait_sec=0.01, max_wait_sec=0.01)
+    with patch("terrarium.execution.trial.ComposableEnvironment", side_effect=failing_then_ok):
+        await TrialQueue(bus, n_concurrent=1, retry_config=retry).run([_make_config("t1")])
+
+    assert sequence == [
+        TrialEvent.QUEUED,
+        TrialEvent.STARTED,
+        TrialEvent.QUEUED,
+        TrialEvent.STARTED,
+        TrialEvent.SUCCEEDED,
+    ]
+
+
+async def test_terminal_failure_emits_failed_with_exception():
+    """When all retries are exhausted, FAILED payload carries the exception."""
+    bus = EventBus()
+    failed_payloads: list[TrialEventPayload] = []
+    bus.subscribe(TrialEvent.FAILED, failed_payloads.append)
+
+    mock_rt = MagicMock()
+    mock_rt.start = MagicMock(side_effect=RuntimeError("boom"))
+    mock_rt.stop = MagicMock()
+
+    retry = RetryConfig(max_retries=0)
+    with patch("terrarium.execution.trial.ComposableEnvironment", return_value=mock_rt):
+        await TrialQueue(bus, n_concurrent=1, retry_config=retry).run([_make_config("t1")])
+
+    assert len(failed_payloads) == 1
+    assert failed_payloads[0].payload.exception.exception_type == "RuntimeError"
+    assert failed_payloads[0].payload.result.exception_info is not None
+
+
+async def test_succeeded_payload_carries_result():
+    """SUCCEEDED payload includes the final TrialResult."""
+    bus = EventBus()
+    payloads: list[TrialEventPayload] = []
+    bus.subscribe(TrialEvent.SUCCEEDED, payloads.append)
+
+    mock_rt = _make_mock_rt()
+    with patch("terrarium.execution.trial.ComposableEnvironment", return_value=mock_rt):
+        await TrialQueue(bus, n_concurrent=1).run([_make_config("t1")])
+
+    assert len(payloads) == 1
+    assert payloads[0].trial_name == "t1"
+    assert payloads[0].payload.result.trial_name == "t1"
+    assert payloads[0].payload.result.exception_info is None
