@@ -5,6 +5,7 @@ import typer
 from typer import Typer
 
 from terrarium.cli.run import run_command
+from terrarium.cli.view import view_command
 
 app = Typer(
     no_args_is_help=True,
@@ -30,3 +31,4 @@ def main(
 
 
 app.command(name="run", help="Run a job from a TOML config file.")(run_command)
+app.command(name="view", help="Browse trial results in a web UI.")(view_command)
