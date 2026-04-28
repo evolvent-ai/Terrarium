@@ -114,6 +114,7 @@ class _ProgressUI:
 
 def run_command(
     config: Annotated[Path, typer.Option("-c", "--config", help="Path to TOML config file.")],
+    overwrite: Annotated[bool, typer.Option("--overwrite", help="Discard existing outputs and re-run all trials.")] = False,
 ) -> None:
     """Run a job from a TOML config file."""
     if not config.exists():
@@ -124,6 +125,8 @@ def run_command(
         with open(config, "rb") as f:
             raw = tomllib.load(f)
         job_config = JobConfig.model_validate(raw)
+        if overwrite:
+            job_config.resume = False
     except Exception as e:
         print_error(f"Invalid config: {e}")
         raise typer.Exit(1)

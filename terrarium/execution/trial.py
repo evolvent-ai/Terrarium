@@ -32,6 +32,13 @@ class Trial:
 
     async def run(self) -> TrialResult:
         cfg = self._config
+
+        if cfg.trial_dir and (cfg.trial_dir / "result.json").exists():
+            try:
+                return TrialResult.model_validate_json((cfg.trial_dir / "result.json").read_text())
+            except Exception as e:
+                logger.warning("Failed to load {}: {}", cfg.trial_dir / "result.json", e)
+
         started_at = datetime.now(timezone.utc)
 
         self._task = cfg.task.instance or Task(cfg.task.path)
@@ -41,7 +48,7 @@ class Trial:
             trial_name = cfg.trial_name
         else:
             model_name = cfg.agent.model_name or ""
-            trial_name = f"{cfg.agent.name}__{model_name}__{self._task.name}__{trial_id}"
+            trial_name = f"{cfg.agent.name}__{model_name.replace('/', '_')}__{self._task.name}__{trial_id}"
 
         if cfg.trial_dir and cfg.trial_dir.exists():
             shutil.rmtree(cfg.trial_dir)

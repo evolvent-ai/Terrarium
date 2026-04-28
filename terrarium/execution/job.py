@@ -40,7 +40,7 @@ class Job:
 
         job_name = cfg.job_name or datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         job_dir = cfg.job_dir or Path("outputs") / job_name
-        if job_dir.exists():
+        if not cfg.resume and job_dir.exists():
             shutil.rmtree(job_dir)
         self._save_config(job_dir)
 
