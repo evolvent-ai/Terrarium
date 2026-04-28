@@ -66,5 +66,8 @@ class BaseAgent(ABC):
     def get_trajectory(self) -> Trajectory:
         """Return complete trajectory from all accumulated act() calls."""
 
+    def collect_logs(self, dest_dir: Path) -> None:
+        """Write raw agent logs into dest_dir. No-op by default."""
+
     def teardown(self) -> None:
         """Clean up resources. No-op by default."""

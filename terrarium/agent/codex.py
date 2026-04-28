@@ -90,6 +90,8 @@ class CodexAgent(BaseAgent):
         self._session_entry_count: int = 0
 
         self._act_results: list[ActResult] = []
+        self._stdouts: list[str] = []
+        self._stderrs: list[str] = []
 
     @staticmethod
     def name() -> str:
@@ -144,6 +146,8 @@ class CodexAgent(BaseAgent):
         logger.info("Codex act: instruction={}", instruction)
 
         result = self._workspace.shell.exec(command)
+        self._stdouts.append(result.stdout or "")
+        self._stderrs.append(result.stderr or "")
         if result.exit_code != 0:
             logger.warning("Codex exit {}: {}", result.exit_code, result.stderr or "")
 
@@ -160,6 +164,13 @@ class CodexAgent(BaseAgent):
         )
         self._act_results.append(act_result)
         return act_result
+
+    def collect_logs(self, dest_dir: Path) -> None:
+        stdout = "".join(f"=== turn {i} ===\n{s}\n" for i, s in enumerate(self._stdouts, 1))
+        stderr = "".join(f"=== turn {i} ===\n{s}\n" for i, s in enumerate(self._stderrs, 1))
+        (dest_dir / "stdout.txt").write_text(stdout)
+        (dest_dir / "stderr.txt").write_text(stderr)
+        self._workspace.fs.download(self._session_file, str(dest_dir / "session.jsonl"))
 
     def get_trajectory(self) -> Trajectory:
         messages = []

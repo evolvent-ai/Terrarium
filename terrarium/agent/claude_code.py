@@ -75,6 +75,8 @@ class ClaudeCodeAgent(BaseAgent):
         self._version: str | None = None
 
         self._act_results: list[ActResult] = []
+        self._stdouts: list[str] = []
+        self._stderrs: list[str] = []
 
 
     @staticmethod
@@ -129,6 +131,8 @@ class ClaudeCodeAgent(BaseAgent):
         logger.info("Claude Code act: instruction={}", instruction)
 
         result = self._workspace.shell.exec(command)
+        self._stdouts.append(result.stdout or "")
+        self._stderrs.append(result.stderr or "")
         if result.exit_code != 0:
             logger.warning("Claude Code exit {}: {}", result.exit_code, result.stderr or "")
 
@@ -144,6 +148,20 @@ class ClaudeCodeAgent(BaseAgent):
         )
         self._act_results.append(act_result)
         return act_result
+
+    def collect_logs(self, dest_dir: Path) -> None:
+        stdout = "".join(f"=== turn {i} ===\n{s}\n" for i, s in enumerate(self._stdouts, 1))
+        stderr = "".join(f"=== turn {i} ===\n{s}\n" for i, s in enumerate(self._stderrs, 1))
+        (dest_dir / "stdout.txt").write_text(stdout)
+        (dest_dir / "stderr.txt").write_text(stderr)
+
+        result = self._workspace.shell.exec(
+            f"find {TERRARIUM_DIR}/projects -name {shlex.quote(self._session_id + '.jsonl')} -type f"
+        )
+        paths = [p for p in (result.stdout or "").strip().split("\n") if p]
+        if len(paths) != 1:
+            raise RuntimeError(f"Expected exactly 1 Claude Code session file, found {len(paths)}: {paths}")
+        self._workspace.fs.download(paths[0], str(dest_dir / "session.jsonl"))
 
     def get_trajectory(self) -> Trajectory:
         messages = []
