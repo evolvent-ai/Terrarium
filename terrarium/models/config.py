@@ -55,3 +55,4 @@ class JobConfig(BaseModel):
     job_dir: Path | None = None
     agent_setup_timeout_sec: float | None = None
     agent_exec_timeout_sec: float | None = None
+    resume: bool = True
