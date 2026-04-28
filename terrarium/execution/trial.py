@@ -68,6 +68,8 @@ class Trial:
                 checker_result, exception_info = await self._execute_task(env, execution_timing)
 
             trajectory = self._collect_trajectory()
+            self._save_trajectory(trajectory)
+            await self._collect_agent_logs()
             await self._teardown_agent()
 
         except Exception as e:
@@ -115,7 +117,24 @@ class Trial:
     def _save_result(self, result: TrialResult) -> None:
         trial_dir = self._config.trial_dir
         if trial_dir is not None:
+            trial_dir.mkdir(parents=True, exist_ok=True)
             (trial_dir / "result.json").write_text(result.model_dump_json(indent=2))
+
+    def _save_trajectory(self, trajectory: Trajectory) -> None:
+        trial_dir = self._config.trial_dir
+        if trial_dir is not None:
+            trial_dir.mkdir(parents=True, exist_ok=True)
+            (trial_dir / "trajectory.json").write_text(trajectory.model_dump_json(indent=2))
+
+    async def _collect_agent_logs(self) -> None:
+        trial_dir = self._config.trial_dir
+        if trial_dir is not None:
+            agent_dir = trial_dir / "agent"
+            agent_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                await asyncio.to_thread(self._agent.collect_logs, agent_dir)
+            except Exception as e:
+                logger.warning("Agent log collection failed: {}", e)
 
     def _create_env(self) -> ComposableEnvironment:
         capabilities = list(self._task.capabilities)
