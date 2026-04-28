@@ -114,7 +114,7 @@ class _ProgressUI:
 
 def run_command(
     config: Annotated[Path, typer.Option("-c", "--config", help="Path to TOML config file.")],
-    overwrite: Annotated[bool, typer.Option("--overwrite", help="Discard existing outputs and re-run all trials.")] = False,
+    overwrite: Annotated[bool, typer.Option("--overwrite", help="Discard existing outputs and re-run from scratch.")] = False,
 ) -> None:
     """Run a job from a TOML config file."""
     if not config.exists():
