@@ -1,15 +1,16 @@
 """Job — batch execution engine."""
 from __future__ import annotations
 
-import shutil
 from collections import defaultdict
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from loguru import logger
+
 from terrarium.dataset.dataset import Dataset
-from terrarium.execution.events import EventBus, JobEvent, JobEventPayload, JobFinishedPayload, JobStartedPayload, TrialEvent
+from terrarium.execution.events import EventBus, JobEvent, JobEventPayload, JobFinishedPayload, JobStartedPayload, TrialEvent, TrialEventPayload, TrialSucceededPayload
 from terrarium.execution.queue import TrialQueue
 from terrarium.metrics.base import BaseMetric
 from terrarium.metrics.builtins import Mean
@@ -40,24 +41,36 @@ class Job:
 
         job_name = cfg.job_name or datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         job_dir = cfg.job_dir or Path("outputs") / job_name
-        if job_dir.exists():
-            shutil.rmtree(job_dir)
         self._save_config(job_dir)
 
-        trial_configs = self._expand_trials(job_dir)
+        all_configs = self._expand_trials(job_dir)
+        completed = self._load_completed_trials(all_configs)
+        pending_configs = [c for c in all_configs if c.trial_name not in completed]
+
+        if completed:
+            logger.info("Resuming: {}/{} trials already completed", len(completed), len(all_configs))
 
         self._events.emit(JobEventPayload(
             event=JobEvent.STARTED,
             job_name=job_name,
-            payload=JobStartedPayload(n_trials=len(trial_configs)),
+            payload=JobStartedPayload(n_trials=len(all_configs)),
         ))
+        for tr in completed.values():
+            self._events.emit(TrialEventPayload(
+                event=TrialEvent.SUCCEEDED,
+                trial_name=tr.trial_name,
+                payload=TrialSucceededPayload(result=tr),
+            ))
 
         queue = TrialQueue(
             n_concurrent=cfg.n_concurrent_trials,
             retry_config=cfg.retry,
             events=self._events,
         )
-        trial_results = await queue.run(trial_configs)
+        new_results = await queue.run(pending_configs)
+
+        by_name = {tr.trial_name: tr for tr in [*completed.values(), *new_results]}
+        trial_results = [by_name[c.trial_name] for c in all_configs if c.trial_name in by_name]
 
         job_result = JobResult(
             trial_results=trial_results,
@@ -72,6 +85,20 @@ class Job:
             payload=JobFinishedPayload(),
         ))
         return job_result
+
+    def _load_completed_trials(self, configs: list[TrialConfig]) -> dict[str, TrialResult]:
+        completed: dict[str, TrialResult] = {}
+        for cfg in configs:
+            if cfg.trial_dir is None:
+                continue
+            result_path = cfg.trial_dir / "result.json"
+            if not result_path.is_file():
+                continue
+            try:
+                completed[cfg.trial_name] = TrialResult.model_validate_json(result_path.read_text())
+            except Exception as e:
+                logger.warning("Ignoring stale result.json at {}: {}", result_path, e)
+        return completed
 
     def _save_config(self, job_dir: Path) -> None:
         job_dir.mkdir(parents=True, exist_ok=True)
