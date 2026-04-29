@@ -1,6 +1,7 @@
 """Tests for configuration models."""
 from pathlib import Path
 import pytest
+from pydantic import ValidationError
 
 from terrarium.models.config import (
     AgentConfig,
@@ -57,15 +58,12 @@ class TestRetryConfig:
 
 
 class TestTrialConfig:
-    def test_defaults(self):
-        cfg = TrialConfig(
-            task=TaskConfig(path="t.py"),
-            agent=AgentConfig(name="a"),
-        )
-        assert cfg.trial_name == ""
-        assert cfg.trial_dir is None
-        assert cfg.agent_setup_timeout_sec is None
-        assert cfg.agent_exec_timeout_sec is None
+    def test_required_fields(self):
+        with pytest.raises(ValidationError):
+            TrialConfig(
+                task=TaskConfig(path="t.py"),
+                agent=AgentConfig(name="a"),
+            )
 
     def test_with_trial_dir(self):
         cfg = TrialConfig(
@@ -76,6 +74,8 @@ class TestTrialConfig:
         )
         assert cfg.trial_name == "run_01"
         assert cfg.trial_dir == Path("/tmp/trials/run_01")
+        assert cfg.agent_setup_timeout_sec is None
+        assert cfg.agent_exec_timeout_sec is None
 
 
 class TestJobConfig:
@@ -88,8 +88,9 @@ class TestJobConfig:
         assert cfg.n_concurrent_trials == 4
         assert isinstance(cfg.retry, RetryConfig)
         assert cfg.retry.max_retries == 0
-        assert cfg.job_dir is None
-        assert cfg.job_name == ""
+        # job_name auto-generated from timestamp; job_dir derived from it
+        assert cfg.job_name
+        assert cfg.job_dir == Path("outputs") / cfg.job_name
         assert cfg.agent_setup_timeout_sec is None
         assert cfg.agent_exec_timeout_sec is None
 

@@ -16,7 +16,7 @@ FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 
 
 class TestClaudeCodeTrial:
-    async def test_single_turn(self):
+    async def test_single_turn(self, tmp_path):
         """Run sample_task with a real Claude Code agent."""
         config = TrialConfig(
             task=TaskConfig(path=str(FIXTURES_DIR / "sample_task")),
@@ -25,6 +25,8 @@ class TestClaudeCodeTrial:
                 import_path="terrarium.agent.claude_code:ClaudeCodeAgent",
                 kwargs={"model": "claude-sonnet-4-6", "max_turns": 5},
             ),
+            trial_name="claude_code_single_turn",
+            trial_dir=tmp_path / "trial",
         )
         trial = Trial(config)
         result = await trial.run()

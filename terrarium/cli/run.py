@@ -96,7 +96,7 @@ class _ProgressUI:
         return f"Trials [green]✓{self._succeeded:<3}[/] [red]✗{self._failed:<3}[/]"
 
     def __enter__(self) -> _ProgressUI:
-        logger.remove()
+        logger.remove(0)
         self._sink_id = logger.add(
             lambda msg: self._log_panel.add(msg.strip()),
             format="{time:HH:mm:ss} | {level:<7} | {message}",
