@@ -15,7 +15,9 @@ SAMPLE_TASK_DIR = FIXTURES_DIR / "sample_task"
 MOCK_AGENT_IMPORT = "tests.agent.mock:MockAgent"
 
 
-def _make_config(task_dir: Path = SAMPLE_TASK_DIR, **kwargs) -> TrialConfig:
+def _make_config(tmp_path: Path, task_dir: Path = SAMPLE_TASK_DIR, **kwargs) -> TrialConfig:
+    kwargs.setdefault("trial_name", "test_trial")
+    kwargs.setdefault("trial_dir", tmp_path / "trial")
     return TrialConfig(
         task=TaskConfig(path=str(task_dir)),
         agent=AgentConfig(name="mock", import_path=MOCK_AGENT_IMPORT),
@@ -33,11 +35,11 @@ def _make_mock_rt():
 
 
 @pytest.mark.asyncio
-async def test_run_sample_task():
+async def test_run_sample_task(tmp_path):
     """A successful trial has score=1.0, non-empty trajectory, no exception."""
     mock_rt = _make_mock_rt()
     with patch("terrarium.execution.trial.ComposableEnvironment", return_value=mock_rt):
-        result = await Trial(_make_config()).run()
+        result = await Trial(_make_config(tmp_path)).run()
 
     assert result.exception_info is None
     assert result.checker_result.score == 1.0
@@ -46,34 +48,24 @@ async def test_run_sample_task():
 
 
 @pytest.mark.asyncio
-async def test_trial_name_auto():
-    """Auto-generated trial_name includes the task name."""
-    mock_rt = _make_mock_rt()
-    with patch("terrarium.execution.trial.ComposableEnvironment", return_value=mock_rt):
-        result = await Trial(_make_config()).run()
-
-    assert "sample_task" in result.trial_name
-
-
-@pytest.mark.asyncio
-async def test_trial_name_explicit():
+async def test_trial_name_explicit(tmp_path):
     """An explicit trial_name is preserved."""
     mock_rt = _make_mock_rt()
     with patch("terrarium.execution.trial.ComposableEnvironment", return_value=mock_rt):
-        result = await Trial(_make_config(trial_name="my_custom_trial")).run()
+        result = await Trial(_make_config(tmp_path, trial_name="my_custom_trial")).run()
 
     assert result.trial_name == "my_custom_trial"
 
 
 @pytest.mark.asyncio
-async def test_exception_captured():
+async def test_exception_captured(tmp_path):
     """When ComposableEnvironment raises, exception_info is set and score remains 0."""
     mock_rt = MagicMock()
     mock_rt.start = MagicMock(side_effect=RuntimeError("boom"))
     mock_rt.stop = MagicMock()
 
     with patch("terrarium.execution.trial.ComposableEnvironment", return_value=mock_rt):
-        result = await Trial(_make_config()).run()
+        result = await Trial(_make_config(tmp_path)).run()
 
     assert result.exception_info is not None
     assert result.exception_info.exception_type == "RuntimeError"
@@ -86,7 +78,7 @@ async def test_persistence(tmp_path):
     trial_dir = tmp_path / "my_trial"
     mock_rt = _make_mock_rt()
     with patch("terrarium.execution.trial.ComposableEnvironment", return_value=mock_rt):
-        await Trial(_make_config(trial_dir=trial_dir)).run()
+        await Trial(_make_config(tmp_path, trial_dir=trial_dir)).run()
 
     assert (trial_dir / "config.json").exists()
     assert (trial_dir / "result.json").exists()
@@ -124,7 +116,7 @@ async def test_task_capabilities_config_passed_to_env(tmp_path):
 
     mock_rt = _make_mock_rt()
     with patch("terrarium.execution.trial.ComposableEnvironment", return_value=mock_rt) as env_ctor:
-        await Trial(_make_config(task_dir=task_dir)).run()
+        await Trial(_make_config(tmp_path, task_dir=task_dir)).run()
 
     _, kwargs = env_ctor.call_args
     assert "postgres" in kwargs["capabilities"]
@@ -145,7 +137,7 @@ async def test_agent_workspace_config_merged(tmp_path):
     mock_rt = _make_mock_rt()
     with patch.object(MockAgent, "workspace_config", classmethod(lambda cls: {"image": {"name": "agent-img"}})), \
          patch("terrarium.execution.trial.ComposableEnvironment", return_value=mock_rt) as env_ctor:
-        await Trial(_make_config(task_dir=task_dir)).run()
+        await Trial(_make_config(tmp_path, task_dir=task_dir)).run()
 
     _, kwargs = env_ctor.call_args
     assert kwargs["capabilities"] == ["workspace"]
@@ -163,7 +155,7 @@ async def test_agent_workspace_image_is_fallback(tmp_path):
     mock_rt = _make_mock_rt()
     with patch.object(MockAgent, "workspace_config", classmethod(lambda cls: {"image": {"name": "agent-img"}})), \
          patch("terrarium.execution.trial.ComposableEnvironment", return_value=mock_rt) as env_ctor:
-        await Trial(_make_config(task_dir=task_dir)).run()
+        await Trial(_make_config(tmp_path, task_dir=task_dir)).run()
 
     _, kwargs = env_ctor.call_args
     assert kwargs["config"]["workspace"] == {"image": {"name": "agent-img"}}
@@ -180,7 +172,7 @@ async def test_task_info_persists_spec_and_capabilities(tmp_path):
 
     mock_rt = _make_mock_rt()
     with patch("terrarium.execution.trial.ComposableEnvironment", return_value=mock_rt):
-        result = await Trial(_make_config(task_dir=task_dir)).run()
+        result = await Trial(_make_config(tmp_path, task_dir=task_dir)).run()
 
     assert result.task_info.spec.metadata.name == "t"
     assert result.task_info.capabilities == ["postgres"]
@@ -188,11 +180,11 @@ async def test_task_info_persists_spec_and_capabilities(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_timing_info_recorded():
+async def test_timing_info_recorded(tmp_path):
     """setup_timing and execution_timing are populated."""
     mock_rt = _make_mock_rt()
     with patch("terrarium.execution.trial.ComposableEnvironment", return_value=mock_rt):
-        result = await Trial(_make_config()).run()
+        result = await Trial(_make_config(tmp_path)).run()
 
     assert result.setup_timing is not None
     assert result.setup_timing.started_at is not None

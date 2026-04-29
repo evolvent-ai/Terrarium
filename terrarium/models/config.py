@@ -37,8 +37,8 @@ class TrialConfig(BaseModel):
     """Config for a single trial."""
     task: TaskConfig
     agent: AgentConfig
-    trial_name: str = ""
-    trial_dir: Path | None = None
+    trial_name: str
+    trial_dir: Path
     agent_setup_timeout_sec: float | None = None
     agent_exec_timeout_sec: float | None = None
 

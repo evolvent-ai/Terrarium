@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from loguru import logger
+
 from terrarium.dataset.dataset import Dataset
 from terrarium.execution.events import EventBus, JobEvent, JobEventPayload, JobFinishedPayload, JobStartedPayload, TrialEvent
 from terrarium.execution.queue import TrialQueue
@@ -44,34 +46,43 @@ class Job:
             shutil.rmtree(job_dir)
         self._save_config(job_dir)
 
-        trial_configs = self._expand_trials(job_dir)
-
-        self._events.emit(JobEventPayload(
-            event=JobEvent.STARTED,
-            job_name=job_name,
-            payload=JobStartedPayload(n_trials=len(trial_configs)),
-        ))
-
-        queue = TrialQueue(
-            n_concurrent=cfg.n_concurrent_trials,
-            retry_config=cfg.retry,
-            events=self._events,
+        sink_id = logger.add(
+            job_dir / "job.log",
+            mode="a" if cfg.resume else "w",
+            level="DEBUG",
+            format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}",
         )
-        trial_results = await queue.run(trial_configs)
+        try:
+            trial_configs = self._expand_trials(job_dir)
 
-        job_result = JobResult(
-            trial_results=trial_results,
-            stats=self._build_stats(trial_results),
-            timing=TimingInfo(started_at=started_at, finished_at=datetime.now(timezone.utc)),
-        )
-        self._save_result(job_dir, job_result)
+            self._events.emit(JobEventPayload(
+                event=JobEvent.STARTED,
+                job_name=job_name,
+                payload=JobStartedPayload(n_trials=len(trial_configs)),
+            ))
 
-        self._events.emit(JobEventPayload(
-            event=JobEvent.FINISHED,
-            job_name=job_name,
-            payload=JobFinishedPayload(),
-        ))
-        return job_result
+            queue = TrialQueue(
+                n_concurrent=cfg.n_concurrent_trials,
+                retry_config=cfg.retry,
+                events=self._events,
+            )
+            trial_results = await queue.run(trial_configs)
+
+            job_result = JobResult(
+                trial_results=trial_results,
+                stats=self._build_stats(trial_results),
+                timing=TimingInfo(started_at=started_at, finished_at=datetime.now(timezone.utc)),
+            )
+            self._save_result(job_dir, job_result)
+
+            self._events.emit(JobEventPayload(
+                event=JobEvent.FINISHED,
+                job_name=job_name,
+                payload=JobFinishedPayload(),
+            ))
+            return job_result
+        finally:
+            logger.remove(sink_id)
 
     def _save_config(self, job_dir: Path) -> None:
         job_dir.mkdir(parents=True, exist_ok=True)

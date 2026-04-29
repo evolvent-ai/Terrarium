@@ -5,12 +5,9 @@ import asyncio
 import shutil
 from copy import deepcopy
 from datetime import datetime, timezone
-from uuid import uuid4
-
 from loguru import logger
 
 from terrarium.environment.environment import ComposableEnvironment
-from terrarium.environment.exceptions import CapabilityNotFoundError
 from terrarium.agent.base import BaseAgent
 from terrarium.agent.registry import create_agent
 from terrarium.models.checker import CheckerResults
@@ -33,7 +30,7 @@ class Trial:
     async def run(self) -> TrialResult:
         cfg = self._config
 
-        if cfg.trial_dir and (cfg.trial_dir / "result.json").exists():
+        if (cfg.trial_dir / "result.json").exists():
             try:
                 return TrialResult.model_validate_json((cfg.trial_dir / "result.json").read_text())
             except Exception as e:
@@ -41,54 +38,50 @@ class Trial:
 
         started_at = datetime.now(timezone.utc)
 
-        self._task = cfg.task.instance or Task(cfg.task.path)
-        self._agent = create_agent(cfg.agent)
-        trial_id = uuid4()
-        if cfg.trial_name:
-            trial_name = cfg.trial_name
-        else:
-            model_name = cfg.agent.model_name or ""
-            trial_name = f"{cfg.agent.name}__{model_name.replace('/', '_')}__{self._task.name}__{trial_id}"
-
-        if cfg.trial_dir and cfg.trial_dir.exists():
+        if cfg.trial_dir.exists():
             shutil.rmtree(cfg.trial_dir)
         self._save_config()
 
         setup_timing, execution_timing = TimingInfo(), TimingInfo()
         checker_result = CheckerResults(checks=[], score=0.0)
         trajectory = Trajectory(messages=[])
-        exception_info: ExceptionInfo | None = None
+        exception_info = None
 
-        env = self._create_env()
+        sink_id = logger.add(
+            cfg.trial_dir / "trial.log",
+            level="DEBUG",
+            format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}",
+            filter=lambda r: r["extra"].get("trial_name") == cfg.trial_name,
+        )
         try:
-            await asyncio.to_thread(env.start)
+            with logger.contextualize(trial_name=cfg.trial_name):
+                self._task = cfg.task.instance or Task(cfg.task.path)
+                self._agent = create_agent(cfg.agent)
+                env = self._create_env()
+                try:
+                    await asyncio.to_thread(env.start)
+                    conn_info = self._collect_conn_info(env)
+                    workspace = env.workspace if "workspace" in env else None
 
-            conn_info = self._collect_conn_info(env)
+                    await self._setup_agent(workspace, conn_info, setup_timing)
+                    checker_result = await self._execute_task(env, execution_timing)
 
-            try:
-                workspace = env.workspace
-            except CapabilityNotFoundError:
-                workspace = None
-            exception_info = await self._setup_agent(workspace, conn_info, setup_timing)
-
-            if exception_info is None:
-                checker_result, exception_info = await self._execute_task(env, execution_timing)
-
-            trajectory = self._collect_trajectory()
-            self._save_trajectory(trajectory)
-            await self._collect_agent_logs()
-            await self._teardown_agent()
-
-        except Exception as e:
-            logger.error("ComposableEnvironment failed: {}", e)
-            if exception_info is None:
-                exception_info = ExceptionInfo.from_exception(e)
+                    trajectory = self._collect_trajectory()
+                    self._save_trajectory(trajectory)
+                    await self._collect_agent_logs()
+                    await self._teardown_agent()
+                except Exception as e:
+                    exception_info = ExceptionInfo.from_exception(e)
+                finally:
+                    try:
+                        await asyncio.to_thread(env.stop)
+                    except Exception as e:
+                        logger.warning("Environment teardown failed: {}", e)
         finally:
-            await asyncio.to_thread(env.stop)
+            logger.remove(sink_id)
 
         trial_result = TrialResult(
-            id=trial_id,
-            trial_name=trial_name,
+            trial_name=cfg.trial_name,
             task_info=TaskInfo(
                 name=self._task.name,
                 path=cfg.task.path,
@@ -113,35 +106,28 @@ class Trial:
         self._save_result(trial_result)
         return trial_result
 
-    # ── Private helpers ──────────────────────────────────────────
-
     def _save_config(self) -> None:
         trial_dir = self._config.trial_dir
-        if trial_dir is not None:
-            trial_dir.mkdir(parents=True, exist_ok=True)
-            (trial_dir / "config.json").write_text(self._config.model_dump_json(indent=2))
+        trial_dir.mkdir(parents=True, exist_ok=True)
+        (trial_dir / "config.json").write_text(self._config.model_dump_json(indent=2))
 
     def _save_result(self, result: TrialResult) -> None:
         trial_dir = self._config.trial_dir
-        if trial_dir is not None:
-            trial_dir.mkdir(parents=True, exist_ok=True)
-            (trial_dir / "result.json").write_text(result.model_dump_json(indent=2))
+        trial_dir.mkdir(parents=True, exist_ok=True)
+        (trial_dir / "result.json").write_text(result.model_dump_json(indent=2))
 
     def _save_trajectory(self, trajectory: Trajectory) -> None:
         trial_dir = self._config.trial_dir
-        if trial_dir is not None:
-            trial_dir.mkdir(parents=True, exist_ok=True)
-            (trial_dir / "trajectory.json").write_text(trajectory.model_dump_json(indent=2))
+        trial_dir.mkdir(parents=True, exist_ok=True)
+        (trial_dir / "trajectory.json").write_text(trajectory.model_dump_json(indent=2))
 
     async def _collect_agent_logs(self) -> None:
-        trial_dir = self._config.trial_dir
-        if trial_dir is not None:
-            agent_dir = trial_dir / "agent"
-            agent_dir.mkdir(parents=True, exist_ok=True)
-            try:
-                await asyncio.to_thread(self._agent.collect_logs, agent_dir)
-            except Exception as e:
-                logger.warning("Agent log collection failed: {}", e)
+        agent_dir = self._config.trial_dir / "agent"
+        agent_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            await asyncio.to_thread(self._agent.collect_logs, agent_dir)
+        except Exception as e:
+            logger.warning("Agent log collection failed: {}", e)
 
     def _create_env(self) -> ComposableEnvironment:
         capabilities = list(self._task.capabilities)
@@ -164,21 +150,20 @@ class Trial:
                 conn_info[cap_name] = cap.connection_info
         return conn_info
 
-    async def _setup_agent(self, workspace, conn_info: dict, timing: TimingInfo) -> ExceptionInfo | None:
+    async def _setup_agent(self, workspace, conn_info: dict, timing: TimingInfo) -> None:
         timing.started_at = datetime.now(timezone.utc)
         try:
             await asyncio.wait_for(
                 asyncio.to_thread(self._agent.setup, workspace, conn_info),
                 timeout=self._config.agent_setup_timeout_sec,
             )
-            return None
         except Exception as e:
             logger.error("Agent setup failed: {}", e)
-            return ExceptionInfo.from_exception(e)
+            raise
         finally:
             timing.finished_at = datetime.now(timezone.utc)
 
-    async def _execute_task(self, env: ComposableEnvironment, timing: TimingInfo) -> tuple[CheckerResults, ExceptionInfo | None]:
+    async def _execute_task(self, env: ComposableEnvironment, timing: TimingInfo) -> CheckerResults:
         timing.started_at = datetime.now(timezone.utc)
         try:
             result = await asyncio.wait_for(
@@ -187,10 +172,10 @@ class Trial:
             )
             if not isinstance(result, CheckerResults):
                 raise TypeError(f"Task must return CheckerResults, got {type(result).__name__}")
-            return result, None
+            return result
         except Exception as e:
             logger.error("Task execution failed: {}", e)
-            return CheckerResults(checks=[], score=0.0), ExceptionInfo.from_exception(e)
+            raise
         finally:
             timing.finished_at = datetime.now(timezone.utc)
 

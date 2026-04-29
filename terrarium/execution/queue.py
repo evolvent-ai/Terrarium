@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import shutil
 
 from loguru import logger
 
@@ -39,6 +40,8 @@ class TrialQueue:
         retry_config = self._retry_config
 
         for attempt in range(retry_config.max_retries + 1):
+            if attempt > 0 and trial_config.trial_dir.exists():
+                shutil.rmtree(trial_config.trial_dir)
             self._events.emit(TrialEventPayload(
                 event=TrialEvent.QUEUED,
                 trial_name=trial_config.trial_name,
