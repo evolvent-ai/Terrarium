@@ -1,8 +1,9 @@
 """Configuration models."""
 from __future__ import annotations
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Any, Self
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from terrarium.task.task import Task
 
@@ -51,8 +52,14 @@ class JobConfig(BaseModel):
     n_attempts: int = 1
     n_concurrent_trials: int = 4
     retry: RetryConfig = Field(default_factory=RetryConfig)
-    job_name: str = ""
+    job_name: str = Field(default_factory=lambda: datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S"))
     job_dir: Path | None = None
     agent_setup_timeout_sec: float | None = None
     agent_exec_timeout_sec: float | None = None
     resume: bool = True
+
+    @model_validator(mode="after")
+    def _default_job_dir(self) -> Self:
+        if self.job_dir is None:
+            self.job_dir = Path("outputs") / self.job_name
+        return self

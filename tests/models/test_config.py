@@ -88,8 +88,9 @@ class TestJobConfig:
         assert cfg.n_concurrent_trials == 4
         assert isinstance(cfg.retry, RetryConfig)
         assert cfg.retry.max_retries == 0
-        assert cfg.job_dir is None
-        assert cfg.job_name == ""
+        # job_name auto-generated from timestamp; job_dir derived from it
+        assert cfg.job_name
+        assert cfg.job_dir == Path("outputs") / cfg.job_name
         assert cfg.agent_setup_timeout_sec is None
         assert cfg.agent_exec_timeout_sec is None
 

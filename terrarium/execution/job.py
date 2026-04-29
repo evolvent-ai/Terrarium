@@ -5,7 +5,6 @@ import shutil
 from collections import defaultdict
 from collections.abc import Callable
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 from loguru import logger
@@ -40,24 +39,22 @@ class Job:
         cfg = self._config
         started_at = datetime.now(timezone.utc)
 
-        job_name = cfg.job_name or datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        job_dir = cfg.job_dir or Path("outputs") / job_name
-        if not cfg.resume and job_dir.exists():
-            shutil.rmtree(job_dir)
-        self._save_config(job_dir)
+        if not cfg.resume and cfg.job_dir.exists():
+            shutil.rmtree(cfg.job_dir)
+        self._save_config()
 
         sink_id = logger.add(
-            job_dir / "job.log",
+            cfg.job_dir / "job.log",
             mode="a" if cfg.resume else "w",
             level="DEBUG",
             format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}",
         )
         try:
-            trial_configs = self._expand_trials(job_dir)
+            trial_configs = self._expand_trials()
 
             self._events.emit(JobEventPayload(
                 event=JobEvent.STARTED,
-                job_name=job_name,
+                job_name=cfg.job_name,
                 payload=JobStartedPayload(n_trials=len(trial_configs)),
             ))
 
@@ -73,60 +70,62 @@ class Job:
                 stats=self._build_stats(trial_results),
                 timing=TimingInfo(started_at=started_at, finished_at=datetime.now(timezone.utc)),
             )
-            self._save_result(job_dir, job_result)
+            self._save_result(job_result)
 
             self._events.emit(JobEventPayload(
                 event=JobEvent.FINISHED,
-                job_name=job_name,
+                job_name=cfg.job_name,
                 payload=JobFinishedPayload(),
             ))
             return job_result
         finally:
             logger.remove(sink_id)
 
-    def _save_config(self, job_dir: Path) -> None:
+    def _save_config(self) -> None:
+        job_dir = self._config.job_dir
         job_dir.mkdir(parents=True, exist_ok=True)
         (job_dir / "config.json").write_text(self._config.model_dump_json(indent=2))
 
-    def _save_result(self, job_dir: Path, result: JobResult) -> None:
+    def _save_result(self, result: JobResult) -> None:
+        job_dir = self._config.job_dir
+        job_dir.mkdir(parents=True, exist_ok=True)
         (job_dir / "result.json").write_text(result.model_dump_json(indent=2))
 
-    def _expand_trials(self, job_dir: Path) -> list[TrialConfig]:
-        task_entries = self._resolve_tasks()
-        cfg = self._config
-        configs: list[TrialConfig] = []
+    def _expand_trials(self) -> list[TrialConfig]:
+        task_configs = self._resolve_tasks()
+        trial_configs: list[TrialConfig] = []
 
-        for agent_cfg in cfg.agents:
-            for task, source in task_entries:
-                for attempt_idx in range(cfg.n_attempts):
+        for agent_cfg in self._config.agents:
+            for task_cfg in task_configs:
+                for attempt_idx in range(self._config.n_attempts):
                     model_name = agent_cfg.model_name or ""
-                    trial_name = f"{agent_cfg.name}__{model_name.replace('/', '_')}__{source}__{task.name}"
-                    if cfg.n_attempts > 1:
+                    trial_name = f"{agent_cfg.name}__{model_name.replace('/', '_')}__{task_cfg.source}__{task_cfg.name}"
+                    if self._config.n_attempts > 1:
                         trial_name += f"__attempt{attempt_idx}"
-                    configs.append(TrialConfig(
-                        task=TaskConfig(path=str(task.dir), name=task.name, source=source, instance=task),
+                    trial_configs.append(TrialConfig(
+                        task=task_cfg,
                         agent=agent_cfg,
                         trial_name=trial_name,
-                        trial_dir=job_dir / trial_name,
-                        agent_setup_timeout_sec=cfg.agent_setup_timeout_sec,
-                        agent_exec_timeout_sec=cfg.agent_exec_timeout_sec,
+                        trial_dir=self._config.job_dir / trial_name,
+                        agent_setup_timeout_sec=self._config.agent_setup_timeout_sec,
+                        agent_exec_timeout_sec=self._config.agent_exec_timeout_sec,
                     ))
-        return configs
+        return trial_configs
 
-    def _resolve_tasks(self) -> list[tuple[Task, str]]:
-        entries: list[tuple[Task, str]] = []
+    def _resolve_tasks(self) -> list[TaskConfig]:
+        task_configs: list[TaskConfig] = []
 
         for ds_path in self._config.datasets:
             dataset = Dataset(ds_path)
             self._datasets[dataset.name] = dataset
             for task in dataset.tasks:
-                entries.append((task, dataset.name))
+                task_configs.append(TaskConfig(path=str(task.dir), name=task.name, source=dataset.name, instance=task))
 
         for task_path in self._config.tasks:
             for task in Task.resolve(task_path):
-                entries.append((task, "adhoc"))
+                task_configs.append(TaskConfig(path=str(task.dir), name=task.name, source="adhoc", instance=task))
 
-        return entries
+        return task_configs
 
     def _build_stats(self, trial_results: list[TrialResult]) -> JobStats:
         groups = self._group_results(trial_results)
@@ -154,9 +153,7 @@ class Job:
         for r in results:
             if r.exception_info is not None:
                 group_stats.n_errors += 1
-                group_stats.exception_stats.setdefault(
-                    r.exception_info.exception_type, []
-                ).append(r.trial_name)
+                group_stats.exception_stats.setdefault(r.exception_info.exception_type, []).append(r.trial_name)
             group_stats.score_stats.setdefault(r.checker_result.score, []).append(r.trial_name)
 
         source = results[0].task_info.source
