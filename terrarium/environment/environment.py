@@ -260,3 +260,6 @@ class ComposableEnvironment:
         if name in caps:
             return CapabilitySelector(name, caps[name])
         raise CapabilityNotFoundError(name, list(caps.keys()))
+
+    def __contains__(self, name: str) -> bool:
+        return name in self._capabilities

@@ -26,10 +26,12 @@ def _patch_cr():
 
 
 class TestTrialEndToEnd:
-    async def test_full_flow(self):
+    async def test_full_flow(self, tmp_path):
         config = TrialConfig(
             task=TaskConfig(path=str(FIXTURES_DIR / "sample_task"), name="sample_task"),
             agent=AgentConfig(name="mock", import_path="tests.agent.mock:MockAgent"),
+            trial_name="t1",
+            trial_dir=tmp_path / "t1",
         )
         with _patch_cr():
             result = await Trial(config).run()
@@ -39,10 +41,12 @@ class TestTrialEndToEnd:
         assert len(result.trajectory.messages) == 2
         assert result.exception_info is None
 
-    async def test_serialization(self):
+    async def test_serialization(self, tmp_path):
         config = TrialConfig(
             task=TaskConfig(path=str(FIXTURES_DIR / "sample_task"), name="sample_task"),
             agent=AgentConfig(name="mock", import_path="tests.agent.mock:MockAgent"),
+            trial_name="t1",
+            trial_dir=tmp_path / "t1",
         )
         with _patch_cr():
             result = await Trial(config).run()

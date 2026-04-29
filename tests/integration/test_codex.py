@@ -16,7 +16,7 @@ FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 
 
 class TestCodexTrial:
-    async def test_single_turn(self):
+    async def test_single_turn(self, tmp_path):
         """Run sample_task with a real Codex agent."""
         config = TrialConfig(
             task=TaskConfig(path=str(FIXTURES_DIR / "sample_task")),
@@ -25,6 +25,8 @@ class TestCodexTrial:
                 import_path="terrarium.agent.codex:CodexAgent",
                 kwargs={"model": "gpt-5.4"},
             ),
+            trial_name="codex_single_turn",
+            trial_dir=tmp_path / "trial",
         )
         trial = Trial(config)
         result = await trial.run()

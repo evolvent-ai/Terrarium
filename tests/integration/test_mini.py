@@ -15,7 +15,7 @@ FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 
 
 class TestMiniTrial:
-    async def test_tool_call(self):
+    async def test_tool_call(self, tmp_path):
         """Run tool_call_task with a real MiniAgent via OpenRouter."""
         config = TrialConfig(
             task=TaskConfig(path=str(FIXTURES_DIR / "tool_call_task")),
@@ -24,6 +24,8 @@ class TestMiniTrial:
                 import_path="terrarium.agent.mini:MiniAgent",
                 kwargs={"model": "openrouter/openai/gpt-4o-mini"},
             ),
+            trial_name="mini_tool_call",
+            trial_dir=tmp_path / "trial",
         )
         trial = Trial(config)
         result = await trial.run()

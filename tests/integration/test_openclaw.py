@@ -38,7 +38,7 @@ def models_config(tmp_path):
 
 
 class TestOpenClawTrial:
-    async def test_single_turn(self, models_config):
+    async def test_single_turn(self, models_config, tmp_path):
         """Run sample_task with a real OpenClaw agent."""
         config = TrialConfig(
             task=TaskConfig(path=str(FIXTURES_DIR / "sample_task")),
@@ -50,6 +50,8 @@ class TestOpenClawTrial:
                     "models_config_path": models_config,
                 },
             ),
+            trial_name="openclaw_single_turn",
+            trial_dir=tmp_path / "trial",
         )
         trial = Trial(config)
         result = await trial.run()
