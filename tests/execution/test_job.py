@@ -132,7 +132,8 @@ async def test_persistence(tmp_path):
     config_data = json.loads((job_dir / "config.json").read_text())
     result_data = json.loads((job_dir / "result.json").read_text())
     assert "agents" in config_data
-    assert "trial_results" in result_data
+    assert "trial_results" not in result_data
+    assert "stats" in result_data
 
 
 async def test_on_registers_trial_event_handler(tmp_path):
