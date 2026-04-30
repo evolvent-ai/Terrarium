@@ -1,4 +1,4 @@
-"""tau2-bench retail task 0: Exchange items in a delivered order."""
+"""tau2-bench retail tasks (parameterized over all 114 scenarios)."""
 from __future__ import annotations
 
 import json
@@ -12,7 +12,6 @@ from benchmarks.tau2.retail.tools import RetailTools
 from benchmarks.tau2.user_simulator import UserSimulator
 from benchmarks.tau2.evaluator import evaluate
 
-TASK_INDEX = 0
 MAX_STEPS = 100
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
@@ -62,8 +61,8 @@ def _is_agent_stop(text: str) -> bool:
 
 
 @entry(capabilities=[])
-def task(env, agent):
-    task_data = _load_tasks()[TASK_INDEX]
+def task(env, agent, *, task_index: int):
+    task_data = _load_tasks()[task_index]
 
     # Apply initialization_data to DB if present
     db = _load_db()
@@ -75,7 +74,6 @@ def task(env, agent):
 
     tools = RetailTools(db)
 
-    # System prompt: <instructions>...</instructions><policy>...</policy>
     agent.system_prompt = AGENT_SYSTEM_PROMPT_TEMPLATE.format(
         agent_instruction=AGENT_INSTRUCTION,
         domain_policy=_load_policy(),
@@ -107,3 +105,12 @@ def task(env, agent):
         db_path=str(DATA_DIR / "db.json"),
         stopped_normally=stopped_normally,
     )
+
+
+@task.parameterize
+def params():
+    for i, raw in enumerate(_load_tasks()):
+        yield {
+            "name": f"retail_task_{raw['id']}",
+            "params": {"task_index": i},
+        }
