@@ -57,7 +57,7 @@ class TrialResult(BaseModel):
     task_info: TaskInfo
     agent_info: AgentInfo
     checker_result: CheckerResults
-    trajectory: Trajectory
+    trajectory: Trajectory | None = Field(default=None, exclude=True)
     exception_info: ExceptionInfo | None = None
     timing: TimingInfo = Field(default_factory=TimingInfo)
     setup_timing: TimingInfo = Field(default_factory=TimingInfo)
@@ -83,6 +83,6 @@ class JobStats(BaseModel):
 class JobResult(BaseModel):
     """Complete result of a job."""
     id: UUID = Field(default_factory=uuid4)
-    trial_results: list[TrialResult]
+    trial_results: list[TrialResult] | None = Field(default=None, exclude=True)
     stats: JobStats
     timing: TimingInfo = Field(default_factory=TimingInfo)

@@ -292,6 +292,39 @@ input[type="file"] { display: none; }
 .exception-msg { color: rgb(var(--text-primary)); margin-top: 6px; font-size: 14px; }
 .exception-tb { margin-top: 10px; }
 
+/* ── Logs ── */
+.log-card {
+  border: 1px solid rgb(var(--border) / 0.08);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  transition: border-color 0.2s ease;
+}
+.log-card:hover { border-color: rgb(var(--border) / 0.16); }
+.log-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer; user-select: none;
+}
+.log-header::before {
+  content: '\25B6'; display: inline-block;
+  font-size: 9px; color: rgb(var(--text-secondary));
+  transition: transform 0.2s ease;
+}
+.log-card.expanded .log-header::before { transform: rotate(90deg); }
+.log-header .label {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px; font-weight: 500;
+  color: rgb(var(--text-primary)); flex: 1;
+}
+.log-header .meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; color: rgb(var(--text-secondary));
+}
+.log-body { display: none; padding: 0 16px 14px; }
+.log-card.expanded .log-body { display: block; }
+.log-body pre { margin: 0; max-height: 500px; }
+
 /* ── Messages ── */
 .message {
   margin: 10px 0; padding: 18px 20px; border-radius: 12px;
@@ -460,9 +493,9 @@ pre {
   <button class="theme-toggle" onclick="toggleTheme()" style="position:fixed;top:20px;right:20px" id="drop-zone-toggle"></button>
   <div id="drop-zone-inner">
     <h2>Terrarium Viewer</h2>
-    <p style="margin-top: 12px; font-size: 14px;">Drop a <strong>result.json</strong> here</p>
-    <p style="margin-top: 6px; font-size: 13px;">Job or Trial level &mdash; or <label for="file-input"><a>browse files</a></label></p>
-    <input type="file" id="file-input" accept=".json">
+    <p style="margin-top: 12px; font-size: 14px;">Drop a <strong>folder</strong> here</p>
+    <p style="margin-top: 6px; font-size: 13px;">Job or trial folder &mdash; or <label for="folder-input"><a>browse</a></label></p>
+    <input type="file" id="folder-input" webkitdirectory>
   </div>
 </div>
 
@@ -474,7 +507,7 @@ pre {
 <script>
 const dropZone = document.getElementById('drop-zone');
 const dropInner = document.getElementById('drop-zone-inner');
-const fileInput = document.getElementById('file-input');
+const folderInput = document.getElementById('folder-input');
 const app = document.getElementById('app');
 const sidebar = document.getElementById('sidebar');
 const main = document.getElementById('main');
@@ -506,8 +539,20 @@ updateThemeIcons();
 
 dropZone.addEventListener('dragover', e => { e.preventDefault(); dropInner.classList.add('drag-over'); });
 dropZone.addEventListener('dragleave', () => dropInner.classList.remove('drag-over'));
-dropZone.addEventListener('drop', e => { e.preventDefault(); dropInner.classList.remove('drag-over'); handleFile(e.dataTransfer.files[0]); });
-fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+dropZone.addEventListener('drop', async e => {
+  e.preventDefault();
+  dropInner.classList.remove('drag-over');
+  const entry = e.dataTransfer.items?.[0]?.webkitGetAsEntry?.();
+  if (!entry?.isDirectory) { alert('Drop a folder, not a file.'); return; }
+  try { await loadFolder(await collectFolderFiles(entry)); }
+  catch (err) { alert('Failed to read folder: ' + err.message); }
+});
+folderInput.addEventListener('change', async e => {
+  const files = {};
+  for (const f of e.target.files) files[f.webkitRelativePath] = f;
+  try { await loadFolder(files); }
+  catch (err) { alert('Failed to load folder: ' + err.message); }
+});
 
 // Keyboard navigation
 document.addEventListener('keydown', e => {
@@ -525,27 +570,160 @@ document.addEventListener('keydown', e => {
   }
 });
 
-function handleFile(file) {
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const data = JSON.parse(e.target.result);
-      loadData(data);
-    } catch(err) { alert('Invalid JSON: ' + err.message); }
-  };
-  reader.readAsText(file);
+// ── Folder loading ──
+
+function readAllEntries(reader) {
+  return new Promise((resolve, reject) => {
+    const all = [];
+    const batch = () => reader.readEntries(
+      entries => entries.length ? (all.push(...entries), batch()) : resolve(all),
+      reject,
+    );
+    batch();
+  });
+}
+
+async function collectFolderFiles(rootEntry) {
+  const files = {};
+  async function walk(entry, path) {
+    if (entry.isFile) {
+      files[path] = await new Promise((res, rej) => entry.file(res, rej));
+    } else if (entry.isDirectory) {
+      const children = await readAllEntries(entry.createReader());
+      for (const c of children) await walk(c, path + '/' + c.name);
+    }
+  }
+  await walk(rootEntry, rootEntry.name);
+  return files;
+}
+
+async function loadFolder(files) {
+  const paths = Object.keys(files);
+  if (paths.length === 0) { alert('Empty folder.'); return; }
+
+  // Strip the top-level folder name to normalize entry-drop and webkitdirectory paths.
+  const topName = paths[0].split('/')[0];
+  const stripped = {};
+  for (const p of paths) {
+    if (p.split('/')[0] !== topName) continue;
+    stripped[p.slice(topName.length + 1)] = files[p];
+  }
+
+  const trialDirs = new Set();
+  for (const p of Object.keys(stripped)) {
+    const parts = p.split('/');
+    if (parts.length === 2 && parts[1] === 'result.json') trialDirs.add(parts[0]);
+  }
+  const hasRootResult = 'result.json' in stripped;
+  const hasRootTrajectory = 'trajectory.json' in stripped;
+
+  const readJson = async f => JSON.parse(await f.text());
+  const tryReadJson = async f => { try { return await readJson(f); } catch { return null; } };
+
+  if (trialDirs.size > 0 && hasRootResult) {
+    const job = await readJson(stripped['result.json']);
+    job._logs = collectLogs(stripped, '');
+    const trial_results = [];
+    for (const t of [...trialDirs].sort()) {
+      const tr = await readJson(stripped[`${t}/result.json`]);
+      const trajFile = stripped[`${t}/trajectory.json`];
+      if (trajFile) tr.trajectory = await tryReadJson(trajFile);
+      tr._logs = collectLogs(stripped, `${t}/`);
+      trial_results.push(tr);
+    }
+    job.trial_results = trial_results;
+    loadData(job);
+  } else if (hasRootResult) {
+    const tr = await readJson(stripped['result.json']);
+    if (hasRootTrajectory) tr.trajectory = await tryReadJson(stripped['trajectory.json']);
+    tr._logs = collectLogs(stripped, '');
+    loadData(tr);
+  } else {
+    alert('Folder does not contain a result.json — drop a job or trial folder.');
+  }
+}
+
+// ── Log collection & rendering ──
+
+const LOG_LABELS = {
+  job_log: 'Framework log (job.log)',
+  trial_log: 'Framework log (trial.log)',
+  agent_stdout: 'Agent stdout',
+  agent_stderr: 'Agent stderr',
+  agent_session: 'Agent session (jsonl)',
+};
+const LOG_PATHS = {
+  job_log: 'job.log',
+  trial_log: 'trial.log',
+  agent_stdout: 'agent/stdout.txt',
+  agent_stderr: 'agent/stderr.txt',
+  agent_session: 'agent/session.jsonl',
+};
+const logFiles = {};
+
+function collectLogs(stripped, prefix) {
+  const logs = {};
+  for (const [key, path] of Object.entries(LOG_PATHS)) {
+    const f = stripped[prefix + path];
+    if (f) logs[key] = f;
+  }
+  return Object.keys(logs).length ? logs : null;
+}
+
+function renderLogs(logsObj, sid) {
+  if (!logsObj) return '';
+  logFiles[sid] = logsObj;
+  let html = '<div class="section"><h2>Logs</h2>';
+  for (const key of Object.keys(LOG_LABELS)) {
+    const f = logsObj[key];
+    if (!f) continue;
+    html += `<div class="log-card" id="log-${sid}-${key}-card">
+      <div class="log-header" onclick="toggleLog('${sid}','${key}')">
+        <span class="label">${esc(LOG_LABELS[key])}</span>
+        <span class="meta">${formatBytes(f.size)}</span>
+      </div>
+      <div class="log-body" id="log-${sid}-${key}"></div>
+    </div>`;
+  }
+  html += '</div>';
+  return html;
+}
+
+function formatBytes(n) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+async function toggleLog(sid, key) {
+  const card = document.getElementById(`log-${sid}-${key}-card`);
+  const body = document.getElementById(`log-${sid}-${key}`);
+  if (!card || !body) return;
+  card.classList.toggle('expanded');
+  if (!card.classList.contains('expanded') || body.dataset.loaded) return;
+  const file = logFiles[sid]?.[key];
+  if (!file) { body.innerHTML = '<pre>(file unavailable)</pre>'; body.dataset.loaded = '1'; return; }
+  body.innerHTML = '<pre style="opacity:0.5">Loading…</pre>';
+  try {
+    body.innerHTML = `<pre>${esc(await file.text())}</pre>`;
+    body.dataset.loaded = '1';
+  } catch (err) {
+    body.innerHTML = `<pre>(failed to load: ${esc(err.message)})</pre>`;
+  }
 }
 
 function loadData(data) {
   if (data.trial_results) {
     jobData = data;
     trialResults = data.trial_results;
-  } else if (data.trajectory) {
+  } else if (data.trial_name) {
     jobData = null;
     trialResults = [data];
+  } else if (data.stats) {
+    alert('Folder looks like a job but has no trial subfolders.');
+    return;
   } else {
-    alert('Unrecognized result.json format');
+    alert('Folder contents not recognized as a job or trial result.');
     return;
   }
   dropZone.classList.add('hidden');
@@ -714,6 +892,10 @@ function renderJobOverview() {
   html += '</div></div>';
 
   html += '</div>';
+
+  // Logs (auxiliary, collapsed by default)
+  html += renderLogs(jobData._logs, jobData.id);
+
   main.innerHTML = html;
 }
 
@@ -827,6 +1009,9 @@ function renderTrialDetail(tr) {
     html += renderMessages(msgs);
     html += '</div>';
   }
+
+  // Logs (auxiliary, collapsed by default)
+  html += renderLogs(tr._logs, tr.id);
 
   main.innerHTML = html;
   wireCollapsibles();

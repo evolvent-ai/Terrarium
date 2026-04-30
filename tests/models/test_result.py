@@ -170,7 +170,7 @@ class TestJobResult:
         )
         data = jr.model_dump()
         assert "id" in data
-        assert len(data["trial_results"]) == 1
+        assert "trial_results" not in data
 
 
 class TestAgentDatasetStats:
