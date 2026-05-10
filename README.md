@@ -265,10 +265,19 @@ Every trial produces a `TrialResult` with the full trajectory, checker pass/fail
 ```
 outputs/{job_name}/
   result.json                    # aggregated stats and metrics
-  {trial_name}/result.json       # full trajectory, checks, timing
+  {trial_name}/result.json       # checks, timing, exception info
+  {trial_name}/trajectory.json   # full trajectory
 ```
 
 Drag any `result.json` into `demo/viewer.html` to explore interactively.
+
+To reuse successful trial trajectories as supervised fine-tuning data, export a completed job to LlamaFactory format:
+
+```bash
+terrarium export llamafactory-sft outputs/{job_name} -o data/terrarium_sft --dataset-name terrarium_sft
+```
+
+The export writes `data.json` and `dataset_info.json` using LlamaFactory's ShareGPT/OpenAI-style `messages` schema. Tool calls are preserved as `function_call` turns, tool results as `observation` turns, and observed tool names/argument shapes are emitted in the LlamaFactory `tools` column. Failed trials are skipped by default; pass `--include-failed` to include them.
 
 ## Design Highlights
 
