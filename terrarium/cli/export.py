@@ -32,10 +32,6 @@ def llamafactory_sft_command(
         "--include-failed",
         help="Include trials with exception_info in their result.json.",
     )] = False,
-    include_thinking: Annotated[bool, typer.Option(
-        "--include-thinking",
-        help="Include ThinkingBlock content in exported assistant messages.",
-    )] = False,
 ) -> None:
     """Export job trajectories as a LlamaFactory SFT dataset."""
     output_dir = output_dir or (job_dir / "llamafactory_sft")
@@ -45,7 +41,6 @@ def llamafactory_sft_command(
             output_dir,
             dataset_name=dataset_name,
             include_failed=include_failed,
-            include_thinking=include_thinking,
         )
     except Exception as e:
         print_error(str(e))

@@ -39,13 +39,11 @@ class LlamaFactorySFTExportResult:
 
 def trajectory_to_llamafactory_messages(
     trajectory: Trajectory,
-    *,
-    include_thinking: bool = False,
 ) -> list[dict[str, str]]:
     """Convert a Terrarium trajectory to LlamaFactory ShareGPT/OpenAI messages."""
     messages: list[dict[str, str]] = []
     for message in trajectory.messages:
-        messages.extend(_message_to_llamafactory_messages(message, include_thinking=include_thinking))
+        messages.extend(_message_to_llamafactory_messages(message))
     return _normalize_message_sequence(messages)
 
 
@@ -80,7 +78,6 @@ def load_llamafactory_sft_records(
     job_dir: str | Path,
     *,
     include_failed: bool = False,
-    include_thinking: bool = False,
 ) -> tuple[list[dict[str, Any]], LlamaFactorySFTExportResult]:
     """Load LlamaFactory SFT records from a Terrarium job output directory."""
     job_dir = Path(job_dir)
@@ -103,14 +100,14 @@ def load_llamafactory_sft_records(
             continue
 
         trajectory = Trajectory.model_validate_json(trajectory_path.read_text())
-        messages = trajectory_to_llamafactory_messages(trajectory, include_thinking=include_thinking)
+        messages = trajectory_to_llamafactory_messages(trajectory)
         if not _has_trainable_assistant_turn(messages):
             n_empty_trajectory_skipped += 1
             continue
 
         records.append({
             "messages": messages,
-            "tools": trajectory_to_llamafactory_tools(trajectory),
+            "tools": trajectory_to_llamafactory_tools_json(trajectory),
         })
 
     placeholder_result = LlamaFactorySFTExportResult(
@@ -134,7 +131,6 @@ def write_llamafactory_sft_dataset(
     dataset_name: str | None = None,
     data_file_name: str = LLAMAFACTORY_DATA_FILE,
     include_failed: bool = False,
-    include_thinking: bool = False,
 ) -> LlamaFactorySFTExportResult:
     """Write a LlamaFactory SFT dataset from Terrarium job outputs."""
     job_dir = Path(job_dir)
@@ -145,7 +141,6 @@ def write_llamafactory_sft_dataset(
     records, summary = load_llamafactory_sft_records(
         job_dir,
         include_failed=include_failed,
-        include_thinking=include_thinking,
     )
     if not records:
         raise ValueError(f"No exportable trajectories found in job directory: {job_dir}")
@@ -171,11 +166,7 @@ def write_llamafactory_sft_dataset(
     )
 
 
-def _message_to_llamafactory_messages(
-    message: Message,
-    *,
-    include_thinking: bool,
-) -> list[dict[str, str]]:
+def _message_to_llamafactory_messages(message: Message) -> list[dict[str, str]]:
     if isinstance(message.content, str):
         content = message.content.strip()
         if not content:
@@ -203,8 +194,7 @@ def _message_to_llamafactory_messages(
         if isinstance(block, TextBlock):
             text_parts.append(block.text)
         elif isinstance(block, ThinkingBlock):
-            if include_thinking:
-                text_parts.append(f"<thinking>\n{block.thinking}\n</thinking>")
+            continue
         else:
             flush_text()
             converted.append({"role": _message_role(message.role), "content": _unknown_block_content(block)})
@@ -215,28 +205,41 @@ def _message_to_llamafactory_messages(
 
 def trajectory_to_llamafactory_tools(trajectory: Trajectory) -> list[dict[str, Any]]:
     """Infer a LlamaFactory tools column from tool calls in a trajectory."""
-    tools_by_name: dict[str, dict[str, Any]] = {}
+    calls_by_name: dict[str, list[ToolUseBlock]] = {}
     for message in trajectory.messages:
         if isinstance(message.content, str):
             continue
         for block in message.content:
-            if isinstance(block, ToolUseBlock) and block.name not in tools_by_name:
-                tools_by_name[block.name] = _tool_schema_from_call(block)
-    return list(tools_by_name.values())
+            if isinstance(block, ToolUseBlock):
+                calls_by_name.setdefault(block.name, []).append(block)
+    return [_tool_schema_from_calls(name, calls) for name, calls in calls_by_name.items()]
 
 
-def _tool_schema_from_call(block: ToolUseBlock) -> dict[str, Any]:
-    properties = {
-        name: _json_schema_for_value(value)
-        for name, value in block.input.items()
-    }
+def trajectory_to_llamafactory_tools_json(trajectory: Trajectory) -> str:
+    """Return the JSON string LlamaFactory expects in the tools column."""
+    tools = trajectory_to_llamafactory_tools(trajectory)
+    return json.dumps(tools, ensure_ascii=False) if tools else ""
+
+
+def _tool_schema_from_calls(name: str, calls: list[ToolUseBlock]) -> dict[str, Any]:
+    properties: dict[str, dict[str, Any]] = {}
+    required_names: set[str] = set(calls[0].input) if calls else set()
+    for call in calls:
+        required_names &= set(call.input)
+        for arg_name, value in call.input.items():
+            schema = _json_schema_for_value(value)
+            if arg_name in properties:
+                properties[arg_name] = _merge_json_schemas(properties[arg_name], schema)
+            else:
+                properties[arg_name] = schema
+
     return {
-        "name": block.name,
-        "description": f"Tool captured from Terrarium trajectory: {block.name}",
+        "name": name,
+        "description": f"Tool captured from Terrarium trajectory: {name}",
         "parameters": {
             "type": "object",
             "properties": properties,
-            "required": list(properties.keys()),
+            "required": [arg_name for arg_name in properties if arg_name in required_names],
         },
     }
 
@@ -258,6 +261,33 @@ def _json_schema_for_value(value: Any) -> dict[str, Any]:
     if value is None:
         return {"type": "null"}
     return {}
+
+
+def _merge_json_schemas(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
+    if left == right:
+        return left
+
+    left_type = left.get("type")
+    right_type = right.get("type")
+    if left_type == right_type:
+        if left_type == "array":
+            return {
+                "type": "array",
+                "items": _merge_json_schemas(left.get("items", {}), right.get("items", {})),
+            }
+        return left
+
+    options: list[dict[str, Any]] = []
+    for schema in (left, right):
+        nested = schema.get("anyOf")
+        if isinstance(nested, list):
+            candidates = [candidate for candidate in nested if isinstance(candidate, dict)]
+        else:
+            candidates = [schema]
+        for candidate in candidates:
+            if candidate not in options:
+                options.append(candidate)
+    return {"anyOf": options}
 
 
 def _message_role(role: str) -> str:
@@ -329,11 +359,15 @@ def _normalize_message_sequence(messages: list[dict[str, str]]) -> list[dict[str
 
 
 def _merge_same_side_messages(left: dict[str, str], right: dict[str, str]) -> dict[str, str]:
-    if left["role"] == "function_call" or right["role"] == "function_call":
+    if left["role"] == "function_call" and right["role"] == "function_call":
         return {
             "role": "function_call",
             "content": _merge_json_message_content(left["content"], right["content"]),
         }
+    if left["role"] == "function_call":
+        return left
+    if right["role"] == "function_call":
+        return right
     if left["role"] == "observation" or right["role"] == "observation":
         parts = [part for part in (left["content"], right["content"]) if part]
         return {"role": "observation", "content": "\n</tool_response>\n<tool_response>\n".join(parts)}

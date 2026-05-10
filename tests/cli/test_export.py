@@ -47,7 +47,7 @@ def test_llamafactory_sft_cli_writes_dataset(tmp_path):
                 {"role": "user", "content": "Hi"},
                 {"role": "assistant", "content": "Hello"},
             ],
-            "tools": [],
+            "tools": "",
         }
     ]
     dataset_info = json.loads((out_dir / "dataset_info.json").read_text())

@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from terrarium.agent.claude_code import parse_stream_json
+from terrarium.agent.codex import parse_codex_session
 from terrarium.adapters.llamafactory import (
     build_dataset_info,
     trajectory_to_llamafactory_messages,
@@ -90,8 +92,7 @@ def _align_like_llamafactory(record: dict, dataset_info_entry: dict) -> dict:
 
     assert len(aligned_messages) % 2 == 0
     tools = record.get(tools_key, "") if tools_key else ""
-    if isinstance(tools, dict) or isinstance(tools, list):
-        tools = json.dumps(tools, ensure_ascii=False)
+    assert isinstance(tools, str)
 
     return {
         "_prompt": aligned_messages[:-1],
@@ -109,7 +110,7 @@ def test_exported_record_aligns_like_sharegpt_reference_format():
             {"from": "observation", "value": "3"},
             {"from": "gpt", "value": "3"},
         ],
-        "tools": [
+        "tools": json.dumps([
             {
                 "name": "add",
                 "description": "Add two numbers",
@@ -122,7 +123,7 @@ def test_exported_record_aligns_like_sharegpt_reference_format():
                     "required": ["a", "b"],
                 },
             }
-        ],
+        ]),
     }
     reference_info = {
         "formatting": "sharegpt",
@@ -170,23 +171,6 @@ def test_converts_text_tool_and_observation_blocks_to_llamafactory_messages():
     ]
 
 
-def test_can_include_thinking_blocks():
-    trajectory = Trajectory(messages=[
-        Message(role="user", content="Question"),
-        Message(role="assistant", content=[
-            ThinkingBlock(thinking="Reasoning"),
-            TextBlock(text="Answer"),
-        ]),
-    ])
-
-    messages = trajectory_to_llamafactory_messages(trajectory, include_thinking=True)
-
-    assert messages == [
-        {"role": "user", "content": "Question"},
-        {"role": "assistant", "content": "<thinking>\nReasoning\n</thinking>\n\nAnswer"},
-    ]
-
-
 def test_drops_orphan_assistant_turns_that_cannot_form_sft_pairs():
     trajectory = Trajectory(messages=[
         Message(role="assistant", content="Answer without prompt"),
@@ -220,6 +204,97 @@ def test_combines_multiple_tool_calls_into_one_function_turn():
         },
         {"role": "observation", "content": "A\n</tool_response>\n<tool_response>\nB"},
         {"role": "assistant", "content": "Done"},
+    ]
+
+
+def test_discards_assistant_text_when_followed_by_same_side_tool_call():
+    trajectory = Trajectory(messages=[
+        Message(role="user", content="Find the file"),
+        Message(role="assistant", content=[TextBlock(text="I will inspect the workspace.")]),
+        Message(role="assistant", content=[
+            ThinkingBlock(thinking="Need a shell command"),
+            ToolUseBlock(id="call_1", name="exec_command", input={"cmd": "ls"}),
+        ]),
+        Message(role="user", content=[
+            ToolResultBlock(tool_use_id="call_1", content="a.txt\n"),
+        ]),
+        Message(role="assistant", content="Found a.txt"),
+    ])
+
+    messages = trajectory_to_llamafactory_messages(trajectory)
+
+    assert messages == [
+        {"role": "user", "content": "Find the file"},
+        {"role": "function_call", "content": '{"arguments": {"cmd": "ls"}, "name": "exec_command"}'},
+        {"role": "observation", "content": "a.txt\n"},
+        {"role": "assistant", "content": "Found a.txt"},
+    ]
+
+
+def test_exports_codex_parser_tool_call_shape_to_llamafactory_messages():
+    lines = [
+        '{"type":"session_meta","payload":{"id":"thread-1"}}',
+        '{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"list files"}]}}',
+        '{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"I will inspect."}]}}',
+        '{"type":"response_item","payload":{"type":"reasoning","summary":[{"type":"summary_text","text":"Need shell"}]}}',
+        '{"type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{\\"cmd\\":\\"ls\\"}","call_id":"c1"}}',
+        '{"type":"response_item","payload":{"type":"function_call_output","call_id":"c1","output":"a.txt\\n"}}',
+        '{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Found a.txt"}]}}',
+    ]
+    messages, _, _ = parse_codex_session(lines)
+
+    exported = trajectory_to_llamafactory_messages(Trajectory(messages=messages))
+
+    assert exported == [
+        {"role": "user", "content": "list files"},
+        {"role": "function_call", "content": '{"arguments": {"cmd": "ls"}, "name": "exec_command"}'},
+        {"role": "observation", "content": "a.txt\n"},
+        {"role": "assistant", "content": "Found a.txt"},
+    ]
+
+
+def test_exports_claude_code_parser_tool_call_shape_to_llamafactory_messages():
+    stdout = "\n".join([
+        json.dumps({
+            "type": "assistant",
+            "message": {
+                "id": "m1",
+                "content": [
+                    {"type": "text", "text": "I will inspect."},
+                    {"type": "thinking", "thinking": "Need shell"},
+                    {"type": "tool_use", "id": "toolu_1", "name": "exec_command", "input": {"cmd": "ls"}},
+                ],
+                "usage": {"input_tokens": 1, "output_tokens": 1},
+            },
+        }),
+        json.dumps({
+            "type": "user",
+            "message": {
+                "id": "m2",
+                "content": [
+                    {"type": "tool_result", "tool_use_id": "toolu_1", "content": [{"type": "text", "text": "a.txt\n"}]},
+                ],
+            },
+        }),
+        json.dumps({
+            "type": "assistant",
+            "message": {
+                "id": "m3",
+                "content": [{"type": "text", "text": "Found a.txt"}],
+                "usage": {"input_tokens": 1, "output_tokens": 1},
+            },
+        }),
+    ])
+    messages, _ = parse_stream_json(stdout)
+    trajectory = Trajectory(messages=[Message(role="user", content="list files"), *messages])
+
+    exported = trajectory_to_llamafactory_messages(trajectory)
+
+    assert exported == [
+        {"role": "user", "content": "list files"},
+        {"role": "function_call", "content": '{"arguments": {"cmd": "ls"}, "name": "exec_command"}'},
+        {"role": "observation", "content": "a.txt\n"},
+        {"role": "assistant", "content": "Found a.txt"},
     ]
 
 
@@ -318,7 +393,7 @@ def test_writes_llamafactory_dataset_from_job_outputs(tmp_path):
                 {"role": "user", "content": "Hi"},
                 {"role": "assistant", "content": "Hello"},
             ],
-            "tools": [],
+            "tools": "",
         }
     ]
 
@@ -339,6 +414,7 @@ def test_infers_tools_column_from_trajectory_tool_calls():
                 "filters": {"kind": "demo"},
             }),
             ToolUseBlock(id="call_2", name="lookup", input={"id": "b"}),
+            ToolUseBlock(id="call_3", name="lookup", input={"id": 3, "mode": None}),
         ]),
     ])
 
@@ -351,13 +427,14 @@ def test_infers_tools_column_from_trajectory_tool_calls():
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "id": {"type": "string"},
+                    "id": {"anyOf": [{"type": "string"}, {"type": "integer"}]},
+                    "mode": {"type": "null"},
                     "limit": {"type": "integer"},
                     "exact": {"type": "boolean"},
                     "tags": {"type": "array", "items": {"type": "string"}},
                     "filters": {"type": "object"},
                 },
-                "required": ["id", "limit", "exact", "tags", "filters"],
+                "required": ["id"],
             },
         }
     ]
@@ -391,20 +468,22 @@ def test_writes_tools_column_for_tool_call_trajectories(tmp_path):
                 {"role": "observation", "content": "3"},
                 {"role": "assistant", "content": "3"},
             ],
-            "tools": [
-                {
-                    "name": "add",
-                    "description": "Tool captured from Terrarium trajectory: add",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "a": {"type": "integer"},
-                            "b": {"type": "integer"},
+            "tools": json.dumps(
+                [
+                    {
+                        "name": "add",
+                        "description": "Tool captured from Terrarium trajectory: add",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "a": {"type": "integer"},
+                                "b": {"type": "integer"},
+                            },
+                            "required": ["a", "b"],
                         },
-                        "required": ["a", "b"],
                     },
-                }
-            ],
+                ]
+            ),
         }
     ]
 
