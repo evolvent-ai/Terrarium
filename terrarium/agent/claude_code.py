@@ -18,6 +18,7 @@ from typing import Any
 from loguru import logger
 
 from terrarium.agent.base import BaseAgent
+from terrarium.models.mcp import MCPServerConfig
 from terrarium.models.result import ActResult
 from terrarium.models.trajectory import (
     ContentBlock,
@@ -73,6 +74,7 @@ class ClaudeCodeAgent(BaseAgent):
         self._workspace = None
         self._session_id: str | None = None
         self._version: str | None = None
+        self._mcp_servers: dict[str, MCPServerConfig] = {}
 
         self._act_results: list[ActResult] = []
         self._stdouts: list[str] = []
@@ -125,6 +127,21 @@ class ClaudeCodeAgent(BaseAgent):
     @property
     def skills_dir(self) -> str:
         return f"{TERRARIUM_DIR}/skills"
+
+    def add_mcp_server(self, config: MCPServerConfig) -> None:
+        self._mcp_servers[config.name] = config
+        servers: dict[str, dict[str, Any]] = {}
+        for name, c in self._mcp_servers.items():
+            if c.transport == "stdio":
+                entry: dict[str, Any] = {"type": "stdio", "command": c.command, "args": c.args, "env": c.env}
+            else:
+                transport = "http" if c.transport == "streamable-http" else c.transport
+                entry = {"type": transport, "url": c.url, "headers": c.headers}
+            servers[name] = entry
+        self._workspace.fs.write_file(
+            f"{TERRARIUM_DIR}/.claude.json",
+            json.dumps({"mcpServers": servers}, indent=2).encode(),
+        )
 
     def act(self, instruction: str) -> ActResult:
         command = self._build_command(instruction)

@@ -17,6 +17,7 @@ import tomli_w
 from loguru import logger
 
 from terrarium.agent.base import BaseAgent
+from terrarium.models.mcp import MCPServerConfig
 from terrarium.models.result import ActResult
 from terrarium.models.trajectory import (
     ContentBlock,
@@ -88,6 +89,7 @@ class CodexAgent(BaseAgent):
         self._session_file: str | None = None
         self._version: str | None = None
         self._session_entry_count: int = 0
+        self._mcp_servers: dict[str, MCPServerConfig] = {}
 
         self._act_results: list[ActResult] = []
         self._stdouts: list[str] = []
@@ -208,7 +210,7 @@ class CodexAgent(BaseAgent):
         return match.group(1) if match else result.stdout.strip()
 
     def _write_config(self) -> None:
-        config = {
+        config: dict = {
             "model_provider": "terrarium",
             "model_providers": {
                 "terrarium": {
@@ -218,7 +220,22 @@ class CodexAgent(BaseAgent):
                 },
             },
         }
+        if self._mcp_servers:
+            config["mcp_servers"] = {
+                name: (
+                    {"command": c.command, "args": c.args, "env": c.env}
+                    if c.transport == "stdio"
+                    else {"url": c.url, "http_headers": c.headers}
+                )
+                for name, c in self._mcp_servers.items()
+            }
         self._workspace.fs.write_file(f"{TERRARIUM_DIR}/config.toml", tomli_w.dumps(config).encode())
+
+    def add_mcp_server(self, config: MCPServerConfig) -> None:
+        if config.transport == "sse":
+            raise NotImplementedError("CodexAgent does not support SSE MCP transport; use stdio or streamable-http")
+        self._mcp_servers[config.name] = config
+        self._write_config()
 
     def _read_new_session_entries(self) -> tuple[list[Message], dict[str, int], str | None]:
         if self._session_file is None:

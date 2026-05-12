@@ -16,6 +16,7 @@ from pathlib import Path
 from loguru import logger
 
 from terrarium.agent.base import BaseAgent
+from terrarium.models.mcp import MCPServerConfig
 from terrarium.models.result import ActResult
 from terrarium.models.trajectory import (
     ContentBlock,
@@ -70,6 +71,7 @@ class OpenClawAgent(BaseAgent):
         self._session_id: str | None = None
         self._version: str | None = None
         self._session_entry_count: int = 0
+        self._mcp_servers: dict[str, MCPServerConfig] = {}
 
         self._act_results: list[ActResult] = []
         self._stdouts: list[str] = []
@@ -194,7 +196,7 @@ class OpenClawAgent(BaseAgent):
         return match.group(1) if match else result.stdout.strip()
 
     def _write_config(self) -> None:
-        config = {
+        config: dict = {
             "agents": {
                 "defaults": {
                     "workspace": f"{TERRARIUM_DIR}/workspace",
@@ -207,9 +209,24 @@ class OpenClawAgent(BaseAgent):
                     "ask": "off",
                 },
             },
+            "models": self._models_config,
         }
-        config["models"] = self._models_config
+        if self._mcp_servers:
+            config["mcp"] = {
+                "servers": {
+                    name: (
+                        {"command": c.command, "args": c.args, "env": c.env}
+                        if c.transport == "stdio"
+                        else {"url": c.url, "headers": c.headers}
+                    )
+                    for name, c in self._mcp_servers.items()
+                },
+            }
         self._workspace.fs.write_file(CONFIG_PATH, json.dumps(config, indent=2).encode())
+
+    def add_mcp_server(self, config: MCPServerConfig) -> None:
+        self._mcp_servers[config.name] = config
+        self._write_config()
 
     def _build_command(self, instruction: str) -> str:
         parts = [
