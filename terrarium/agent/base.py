@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
     from terrarium.environment.capabilities.workspace import WorkspaceCapability
+    from terrarium.models.mcp import MCPServerConfig
     from terrarium.models.result import ActResult
     from terrarium.models.trajectory import Trajectory
 
@@ -52,6 +53,12 @@ class BaseAgent(ABC):
     def install_skill(self, path: str | Path) -> None:
         """Install a skill into the agent. Raises NotImplementedError by default."""
         raise NotImplementedError(f"Agent '{self.name()}' does not support skills")
+
+    def add_mcp_server(self, config: MCPServerConfig) -> None:
+        """Register an MCP server. Raises NotImplementedError by default."""
+        raise NotImplementedError(
+            f"Agent '{self.name()}' does not support MCP servers"
+        )
 
     @property
     def skills_dir(self) -> str | None:
