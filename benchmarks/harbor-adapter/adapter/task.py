@@ -16,6 +16,7 @@ from pathlib import Path
 from loguru import logger
 
 from terrarium.models.checker import CheckerResults
+from terrarium.models.mcp import MCPServerConfig
 from terrarium.task.decorator import entry
 
 
@@ -30,6 +31,9 @@ def harbor_task(env, agent, *, task_dir: str):
     skills_dir = cfg.get("environment", {}).get("skills_dir")
     if skills_dir:
         _register_skills(env.workspace, agent, skills_dir)
+
+    for spec in _build_mcp_servers(cfg.get("environment", {}).get("mcp_servers", [])):
+        agent.add_mcp_server(spec)
 
     agent.act(instruction)
 
@@ -92,7 +96,7 @@ def params():
             )
             continue
         for field in (
-            "gpus", "gpu_types", "allow_internet", "mcp_servers",
+            "gpus", "gpu_types", "allow_internet",
             "build_timeout_sec", "healthcheck",
         ):
             if field in env_cfg:
@@ -159,6 +163,21 @@ def _read_reward(workspace) -> float:
             f"{sorted(rewards.keys())}"
         )
     return float(next(iter(rewards.values())))
+
+
+def _build_mcp_servers(entries: list[dict]) -> list[MCPServerConfig]:
+    """Build MCPServerConfig list from Harbor's mcp_servers entries."""
+    out: list[MCPServerConfig] = []
+    for raw in entries:
+        transport = raw.get("transport", "sse")
+        kwargs: dict = {"name": raw["name"], "transport": transport}
+        if transport == "stdio":
+            kwargs["command"] = raw.get("command")
+            kwargs["args"] = raw.get("args", [])
+        else:
+            kwargs["url"] = raw.get("url")
+        out.append(MCPServerConfig(**kwargs))
+    return out
 
 
 def _register_skills(workspace, agent, skills_dir: str) -> None:
