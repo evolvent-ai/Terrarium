@@ -215,6 +215,33 @@ class TestSetup:
         assert config["agents"]["defaults"]["model"]["primary"] == "mycloud/m"
         assert config["agents"]["defaults"]["workspace"] == f"{TERRARIUM_DIR}/workspace"
         assert config["tools"]["exec"]["security"] == "full"
+        assert "systemPromptOverride" not in config["agents"]["defaults"]
+
+    def test_system_prompt_setter_rewrites_config(self, models_config):
+        """Setting system_prompt after setup re-writes config with systemPromptOverride."""
+        agent, workspace = _make_agent(models_config)
+        agent.setup(workspace, {})
+        before = len(workspace.fs.write_file_calls)
+
+        agent.system_prompt = "You are a careful coding agent."
+
+        # One new write happened, with the override populated.
+        assert len(workspace.fs.write_file_calls) == before + 1
+        config = json.loads(workspace.fs.write_file_calls[-1][1])
+        assert config["agents"]["defaults"]["systemPromptOverride"] == "You are a careful coding agent."
+
+    def test_system_prompt_via_constructor(self, models_config):
+        """system_prompt passed at construction flows into config on setup."""
+        agent = OpenClawAgent(models_config_path=models_config, system_prompt="instructions")
+        assert agent.system_prompt == "instructions"
+        workspace = _FakeWorkspace(shell_responses=[
+            _FakeExecResult(exit_code=0),
+            _FakeExecResult(exit_code=0, stdout="/usr/local/bin/openclaw"),
+            _FakeExecResult(stdout="openclaw version 2026.4.1"),
+        ])
+        agent.setup(workspace, {})
+        config = json.loads(workspace.fs.write_file_calls[-1][1])
+        assert config["agents"]["defaults"]["systemPromptOverride"] == "instructions"
 
 
 class TestBuildCommand:
