@@ -35,6 +35,14 @@ class ImageSpec(BaseModel):
         return self
 
 
+class VolumeMount(BaseModel):
+    """Bind mount of a host path into the sandbox."""
+
+    source: str
+    target: str
+    read_only: bool = False
+
+
 class ResourceLimits(BaseModel):
     """Sandbox-level resource limits."""
 
@@ -49,7 +57,7 @@ class SandboxSpec(BaseModel):
     image: ImageSpec
     ports: list[int] = Field(default_factory=list)
     env: dict[str, str] = Field(default_factory=dict)
-    volumes: dict[str, str] = Field(default_factory=dict)
+    volumes: list[VolumeMount] = Field(default_factory=list)
     command: str | list[str] | None = None
     name: str | None = None
     resources: ResourceLimits = Field(default_factory=ResourceLimits)

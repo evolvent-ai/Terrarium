@@ -47,7 +47,7 @@ def test_sandbox_spec_defaults():
     assert spec.image.build is None
     assert spec.ports == []
     assert spec.env == {}
-    assert spec.volumes == {}
+    assert spec.volumes == []
     assert spec.command is None
     assert spec.resources == ResourceLimits()
     assert spec.workdir is None
@@ -58,12 +58,20 @@ def test_sandbox_spec_full():
         image=ImageSpec(name="postgres:16"),
         ports=[5432],
         env={"POSTGRES_DB": "main"},
-        volumes={"/tmp/data": "/data"},
+        volumes=[
+            {"source": "/tmp/data", "target": "/data"},
+            {"source": "/tmp/cache", "target": "/cache", "read_only": True},
+        ],
         command=["postgres", "-c", "max_connections=100"],
     )
     assert spec.ports == [5432]
     assert spec.env["POSTGRES_DB"] == "main"
-    assert spec.volumes["/tmp/data"] == "/data"
+    assert spec.volumes[0].source == "/tmp/data"
+    assert spec.volumes[0].target == "/data"
+    assert spec.volumes[0].read_only is False
+    assert spec.volumes[1].source == "/tmp/cache"
+    assert spec.volumes[1].target == "/cache"
+    assert spec.volumes[1].read_only is True
     assert spec.command == ["postgres", "-c", "max_connections=100"]
 
 

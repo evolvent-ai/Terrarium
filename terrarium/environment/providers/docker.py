@@ -166,8 +166,8 @@ class DockerSandboxProvider(SandboxProvider):
             kwargs["environment"] = spec.env
         if spec.volumes:
             kwargs["volumes"] = {
-                host: {"bind": container, "mode": "rw"}
-                for host, container in spec.volumes.items()
+                mount.source: {"bind": mount.target, "mode": "ro" if mount.read_only else "rw"}
+                for mount in spec.volumes
             }
         if spec.name:
             # External network names don't carry session_id; add it to avoid
