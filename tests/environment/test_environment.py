@@ -49,6 +49,21 @@ def test_runtime_getattr_before_start():
 
 
 @patch("terrarium.environment.capabilities.postgres.psycopg2")
+def test_runtime_iter_and_len(mock_psycopg2):
+    provider = _mock_provider()
+    env = ComposableEnvironment(["postgres", "workspace"], provider=provider)
+    assert len(env) == 0
+    env.start()
+    try:
+        assert set(env) == {"postgres", "workspace"}
+        assert len(env) == 2
+        assert "postgres" in env
+        assert "redis" not in env
+    finally:
+        env.stop()
+
+
+@patch("terrarium.environment.capabilities.postgres.psycopg2")
 def test_runtime_cleanup_on_partial_failure(mock_psycopg2):
     provider = MagicMock()
     call_count = 0

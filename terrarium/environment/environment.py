@@ -263,3 +263,9 @@ class ComposableEnvironment:
 
     def __contains__(self, name: str) -> bool:
         return name in self._capabilities
+
+    def __iter__(self):
+        return iter(self._capabilities)
+
+    def __len__(self) -> int:
+        return len(self._capabilities)
