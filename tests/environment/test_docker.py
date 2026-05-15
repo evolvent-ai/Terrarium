@@ -15,7 +15,7 @@ class TestDockerSandbox:
     def _make_sandbox(self):
         container = MagicMock()
         container.exec_run.return_value = (0, (b"hello\nworld", b""))
-        container.ports = {"5432/tcp": [{"HostIp": "0.0.0.0", "HostPort": "15432"}]}
+        container.ports = {"5432/tcp": [{"HostIp": "127.0.0.1", "HostPort": "15432"}]}
         return DockerSandbox(container)
 
     def test_exec_string(self):
@@ -36,7 +36,7 @@ class TestDockerSandbox:
     def test_get_host(self):
         sandbox = self._make_sandbox()
         host, port = sandbox.get_host(5432)
-        assert host == "0.0.0.0"
+        assert host == "127.0.0.1"
         assert port == 15432
 
     def test_stop(self):

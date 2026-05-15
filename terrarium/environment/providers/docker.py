@@ -161,7 +161,7 @@ class DockerSandboxProvider(SandboxProvider):
         if self._network:
             kwargs["network"] = self._network.name
         if spec.ports:
-            kwargs["ports"] = {f"{p}/tcp": None for p in spec.ports}
+            kwargs["ports"] = {f"{p}/tcp": ("127.0.0.1", None) for p in spec.ports}
         if spec.env:
             kwargs["environment"] = spec.env
         if spec.volumes:
