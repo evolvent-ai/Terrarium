@@ -228,9 +228,9 @@ class OpenClawAgent(BaseAgent):
             config["mcp"] = {
                 "servers": {
                     name: (
-                        {"command": c.command, "args": c.args, "env": c.env}
+                        {"transport": "stdio", "command": c.command, "args": c.args, "env": c.env}
                         if c.transport == "stdio"
-                        else {"url": c.url, "headers": c.headers}
+                        else {"transport": c.transport, "url": c.url, "headers": c.headers}
                     )
                     for name, c in self._mcp_servers.items()
                 },
