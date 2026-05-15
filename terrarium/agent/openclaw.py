@@ -63,9 +63,11 @@ class OpenClawAgent(BaseAgent):
         self,
         model: str = "anthropic/claude-sonnet-4-6",
         models_config_path: str = "",
+        system_prompt: str | None = None,
     ):
         self._model = model
         self._models_config = json.loads(Path(models_config_path).read_text())
+        self._system_prompt: str | None = system_prompt
 
         self._workspace = None
         self._session_id: str | None = None
@@ -87,6 +89,15 @@ class OpenClawAgent(BaseAgent):
     @classmethod
     def workspace_config(cls) -> dict:
         return {"image": {"name": DEFAULT_IMAGE}}
+
+    @property
+    def system_prompt(self) -> str | None:
+        return self._system_prompt
+
+    @system_prompt.setter
+    def system_prompt(self, value: str | None) -> None:
+        self._system_prompt = value
+        self._write_config()
 
     def setup(self, workspace, conn_info: dict) -> None:
         self._workspace = workspace
@@ -211,6 +222,8 @@ class OpenClawAgent(BaseAgent):
             },
             "models": self._models_config,
         }
+        if self._system_prompt:
+            config["agents"]["defaults"]["systemPromptOverride"] = self._system_prompt
         if self._mcp_servers:
             config["mcp"] = {
                 "servers": {
