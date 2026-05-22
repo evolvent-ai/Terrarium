@@ -6,15 +6,24 @@ docstrings. Uses litellm for provider-agnostic LLM calls.
 """
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
 import json
+import threading
 from typing import Any, Callable
 
 import litellm
 from langchain_core.utils.function_calling import convert_to_openai_tool
+from litellm import experimental_mcp_client
 from loguru import logger
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.sse import sse_client
+from mcp.client.stdio import stdio_client
+from mcp.client.streamable_http import streamable_http_client
 from pydantic_core import to_jsonable_python
 
 from terrarium.agent.base import BaseAgent
+from terrarium.models.mcp import MCPServerConfig
 from terrarium.models.result import ActResult
 from terrarium.models.trajectory import (
     ContentBlock,
@@ -50,6 +59,8 @@ class MiniAgent(BaseAgent):
         self._tools: dict[str, Callable] = {}
         self._tool_schemas: list[dict] = []
 
+        self._mcp_sessions: list[_MCPSession] = []
+
         self._messages: list[dict] = []
         self._act_results: list[ActResult] = []
 
@@ -84,6 +95,24 @@ class MiniAgent(BaseAgent):
             name = schema["function"]["name"]
             self._tools[name] = fn
             self._tool_schemas.append(schema)
+
+    def add_mcp_server(self, config: MCPServerConfig) -> None:
+        session = _MCPSession(config)
+        self._mcp_sessions.append(session)
+
+        def wrap_tool(name: str) -> Callable:
+            def call(**kwargs):
+                return session.call_tool(name, kwargs)
+            return call
+
+        for tool in session.tools:
+            name = tool["function"]["name"]
+            self._tools[name] = wrap_tool(name)
+            self._tool_schemas.append(dict(tool))
+
+    def teardown(self) -> None:
+        for session in self._mcp_sessions:
+            session.close()
 
     def act(self, instruction: str) -> ActResult:
         logger.info("MiniAgent act: instruction={}", instruction)
@@ -195,6 +224,56 @@ class MiniAgent(BaseAgent):
                 total_tool_calls=total_tool_calls or None,
             ),
         )
+
+
+class _MCPSession:
+    """Persistent MCP session on a dedicated bg thread+loop. Sync facade over async mcp SDK."""
+
+    def __init__(self, config: MCPServerConfig):
+        self._loop = asyncio.new_event_loop()
+        self._thread = threading.Thread(target=self._loop.run_forever, daemon=True, name=f"miniagent-mcp-{config.name}")
+        self._thread.start()
+        promise: concurrent.futures.Future = concurrent.futures.Future()
+
+        async def _serve():
+            stop = asyncio.Event()
+            try:
+                if config.transport == "stdio":
+                    ctx = stdio_client(StdioServerParameters(command=config.command, args=config.args, env=config.env))
+                elif config.transport == "sse":
+                    ctx = sse_client(config.url, headers=config.headers)
+                elif config.transport == "streamable-http":
+                    ctx = streamable_http_client(config.url, headers=config.headers)
+                else:
+                    raise ValueError(f"Unsupported MCP transport: {config.transport!r}")
+                async with ctx as (read, write):
+                    async with ClientSession(read, write) as session:
+                        await session.initialize()
+                        tools = await experimental_mcp_client.load_mcp_tools(session=session, format="openai")
+                        promise.set_result((session, tools, stop))
+                        await stop.wait()
+            except BaseException as e:
+                if not promise.done():
+                    promise.set_exception(e)
+                raise
+
+        self._worker_future = asyncio.run_coroutine_threadsafe(_serve(), self._loop)
+        self._session, self.tools, self._stop_event = promise.result()
+
+    def call_tool(self, name: str, args: dict):
+        return asyncio.run_coroutine_threadsafe(
+            asyncio.wait_for(self._session.call_tool(name, args), timeout=60),
+            self._loop,
+        ).result()
+
+    def close(self) -> None:
+        try:
+            self._loop.call_soon_threadsafe(self._stop_event.set)
+            self._worker_future.result(timeout=5)
+            self._loop.call_soon_threadsafe(self._loop.stop)
+            self._thread.join(timeout=5)
+        except Exception as e:
+            logger.warning("MCP session close failed: {}", e)
 
 
 def _openai_dicts_to_trajectory(openai_messages: list[dict]) -> list[Message]:
