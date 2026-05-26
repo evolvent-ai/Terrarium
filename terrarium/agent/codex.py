@@ -248,7 +248,7 @@ class CodexAgent(BaseAgent):
         lines = raw.decode().strip().split("\n")
         new_lines = lines[self._session_entry_count:]
         self._session_entry_count = len(lines)
-        return parse_codex_session(new_lines)
+        return _parse_codex_session(new_lines)
 
     def _build_command(self, instruction: str) -> str:
         return f"{self._build_env_vars()}codex {self._build_subcommand()} {self._build_flags()}{shlex.quote(instruction)}"
@@ -274,7 +274,7 @@ class CodexAgent(BaseAgent):
         return " ".join(parts) + " "
 
 
-def parse_codex_session(lines: list[str]) -> tuple[list[Message], dict[str, int], str | None]:
+def _parse_codex_session(lines: list[str]) -> tuple[list[Message], dict[str, int], str | None]:
     """Parse Codex session JSONL lines into messages, usage totals, and session ID.
 
     Event types handled:

@@ -138,6 +138,10 @@ class OpenClawAgent(BaseAgent):
     def skills_dir(self) -> str:
         return f"{TERRARIUM_DIR}/workspace/skills"
 
+    def add_mcp_server(self, config: MCPServerConfig) -> None:
+        self._mcp_servers[config.name] = config
+        self._write_config()
+
     def act(self, instruction: str) -> ActResult:
         command = self._build_command(instruction)
         logger.info("OpenClaw act: instruction={}", instruction)
@@ -237,10 +241,6 @@ class OpenClawAgent(BaseAgent):
             }
         self._workspace.fs.write_file(CONFIG_PATH, json.dumps(config, indent=2).encode())
 
-    def add_mcp_server(self, config: MCPServerConfig) -> None:
-        self._mcp_servers[config.name] = config
-        self._write_config()
-
     def _build_command(self, instruction: str) -> str:
         parts = [
             f"OPENCLAW_STATE_DIR={shlex.quote(TERRARIUM_DIR)}",
@@ -254,10 +254,6 @@ class OpenClawAgent(BaseAgent):
         return " ".join(parts)
 
     def _read_new_session_entries(self) -> tuple[list[Message], dict[str, int]]:
-        """Read new entries from the session JSONL file.
-
-        Returns (messages, usage) where usage is summed from all assistant messages.
-        """
         session_path = f"{SESSION_DIR}/{self._session_id}.jsonl"
         raw = self._workspace.fs.read_file(session_path)
 

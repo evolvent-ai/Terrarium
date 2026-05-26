@@ -6,7 +6,7 @@ from terrarium.agent.codex import (
     CodexAgent,
     SESSION_DIR,
     TERRARIUM_DIR,
-    parse_codex_session,
+    _parse_codex_session,
     _parse_json_arguments,
 )
 from terrarium.models.trajectory import ThinkingBlock, ToolUseBlock
@@ -387,40 +387,40 @@ class TestAct:
 
 class TestParseCodexSession:
     def test_empty_input(self):
-        messages, usage, session_id = parse_codex_session([])
+        messages, usage, session_id = _parse_codex_session([])
         assert messages == []
         assert usage["input_tokens"] == 0
         assert session_id is None
 
     def test_session_meta(self):
         line = '{"type":"session_meta","payload":{"id":"abc-123","cwd":"/tmp"}}'
-        _, _, session_id = parse_codex_session([line])
+        _, _, session_id = _parse_codex_session([line])
         assert session_id == "abc-123"
 
     def test_assistant_message(self):
         line = '{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Hello!"}]}}'
-        messages, _, _ = parse_codex_session([line])
+        messages, _, _ = _parse_codex_session([line])
         assert len(messages) == 1
         assert messages[0].role == "assistant"
         assert messages[0].content[0].text == "Hello!"
 
     def test_user_message(self):
         line = '{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"hi"}]}}'
-        messages, _, _ = parse_codex_session([line])
+        messages, _, _ = _parse_codex_session([line])
         assert len(messages) == 1
         assert messages[0].role == "user"
         assert messages[0].content[0].text == "hi"
 
     def test_developer_message(self):
         line = '{"type":"response_item","payload":{"type":"message","role":"developer","content":[{"type":"input_text","text":"system prompt"}]}}'
-        messages, _, _ = parse_codex_session([line])
+        messages, _, _ = _parse_codex_session([line])
         assert len(messages) == 1
         assert messages[0].role == "developer"
         assert messages[0].content[0].text == "system prompt"
 
     def test_function_call(self):
         line = '{"type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{\\"cmd\\":\\"ls\\"}","call_id":"call_abc"}}'
-        messages, _, _ = parse_codex_session([line])
+        messages, _, _ = _parse_codex_session([line])
         assert len(messages) == 1
         assert messages[0].role == "assistant"
         block = messages[0].content[0]
@@ -430,7 +430,7 @@ class TestParseCodexSession:
 
     def test_function_call_output(self):
         line = '{"type":"response_item","payload":{"type":"function_call_output","call_id":"call_abc","output":"file.txt\\n"}}'
-        messages, _, _ = parse_codex_session([line])
+        messages, _, _ = _parse_codex_session([line])
         assert len(messages) == 1
         assert messages[0].role == "user"
         block = messages[0].content[0]
@@ -439,7 +439,7 @@ class TestParseCodexSession:
 
     def test_custom_tool_call(self):
         line = '{"type":"response_item","payload":{"type":"custom_tool_call","name":"my_tool","input":"{\\"x\\":1}","call_id":"c1"}}'
-        messages, _, _ = parse_codex_session([line])
+        messages, _, _ = _parse_codex_session([line])
         assert len(messages) == 1
         block = messages[0].content[0]
         assert block.name == "my_tool"
@@ -447,14 +447,14 @@ class TestParseCodexSession:
 
     def test_custom_tool_call_output(self):
         line = '{"type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"c1","output":"done"}}'
-        messages, _, _ = parse_codex_session([line])
+        messages, _, _ = _parse_codex_session([line])
         assert len(messages) == 1
         assert messages[0].role == "user"
         assert messages[0].content[0].content == "done"
 
     def test_web_search_call(self):
         line = '{"type":"response_item","payload":{"type":"web_search_call","id":"ws1","action":{"type":"search","query":"python asyncio"}}}'
-        messages, _, _ = parse_codex_session([line])
+        messages, _, _ = _parse_codex_session([line])
         assert len(messages) == 1
         block = messages[0].content[0]
         assert block.name == "web_search_call"
@@ -462,7 +462,7 @@ class TestParseCodexSession:
 
     def test_token_count(self):
         line = '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":100,"output_tokens":50,"cached_input_tokens":20,"reasoning_output_tokens":10}}}}'
-        _, usage, _ = parse_codex_session([line])
+        _, usage, _ = _parse_codex_session([line])
         assert usage["input_tokens"] == 100
         # output + reasoning combined
         assert usage["output_tokens"] == 60
@@ -471,7 +471,7 @@ class TestParseCodexSession:
     def test_token_count_null_info(self):
         """First token_count event in a session has info=null (just rate limits)."""
         line = '{"type":"event_msg","payload":{"type":"token_count","info":null,"rate_limits":{}}}'
-        _, usage, _ = parse_codex_session([line])
+        _, usage, _ = _parse_codex_session([line])
         assert usage["input_tokens"] == 0
 
     def test_token_count_accumulates(self):
@@ -480,7 +480,7 @@ class TestParseCodexSession:
             '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":100,"output_tokens":50,"cached_input_tokens":0,"reasoning_output_tokens":0}}}}',
             '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":200,"output_tokens":100,"cached_input_tokens":50,"reasoning_output_tokens":0}}}}',
         ]
-        _, usage, _ = parse_codex_session(lines)
+        _, usage, _ = _parse_codex_session(lines)
         assert usage["input_tokens"] == 300
         assert usage["output_tokens"] == 150
 
@@ -490,7 +490,7 @@ class TestParseCodexSession:
             '{"type":"response_item","payload":{"type":"reasoning","summary":[],"content":null,"encrypted_content":"..."}}',
             '{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"hi"}]}}',
         ]
-        messages, _, _ = parse_codex_session(lines)
+        messages, _, _ = _parse_codex_session(lines)
         assert len(messages) == 1
         assert len(messages[0].content) == 1
         assert messages[0].content[0].text == "hi"
@@ -501,7 +501,7 @@ class TestParseCodexSession:
             '{"type":"response_item","payload":{"type":"reasoning","summary":[{"type":"summary_text","text":"Thinking..."}]}}',
             '{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Done"}]}}',
         ]
-        messages, _, _ = parse_codex_session(lines)
+        messages, _, _ = _parse_codex_session(lines)
         assert len(messages) == 1
         assert len(messages[0].content) == 2
         assert isinstance(messages[0].content[0], ThinkingBlock)
@@ -517,7 +517,7 @@ class TestParseCodexSession:
             ']}}',
             '{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"ok"}]}}',
         ]
-        messages, _, _ = parse_codex_session(lines)
+        messages, _, _ = _parse_codex_session(lines)
         assert len(messages) == 1
         assert len(messages[0].content) == 3
         assert messages[0].content[0].thinking == "First thought"
@@ -530,7 +530,7 @@ class TestParseCodexSession:
             '{"type":"response_item","payload":{"type":"reasoning","summary":[{"type":"summary_text","text":"Let me list"}]}}',
             '{"type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{}","call_id":"c1"}}',
         ]
-        messages, _, _ = parse_codex_session(lines)
+        messages, _, _ = _parse_codex_session(lines)
         assert len(messages) == 1
         assert len(messages[0].content) == 2
         assert isinstance(messages[0].content[0], ThinkingBlock)
@@ -543,7 +543,7 @@ class TestParseCodexSession:
             '{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"hi"}]}}',
             '{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"bye"}]}}',
         ]
-        messages, _, _ = parse_codex_session(lines)
+        messages, _, _ = _parse_codex_session(lines)
         assert len(messages) == 2
         assert messages[0].role == "user"
         assert len(messages[0].content) == 1
@@ -558,12 +558,12 @@ class TestParseCodexSession:
             '{"type":"response_item","payload":{"type":"reasoning","summary":[{"type":"summary_text","text":"second"}]}}',
             '{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"ok"}]}}',
         ]
-        messages, _, _ = parse_codex_session(lines)
+        messages, _, _ = _parse_codex_session(lines)
         assert len(messages) == 1
         assert messages[0].content[0].thinking == "second"
 
     def test_invalid_json_skipped(self):
-        messages, _, _ = parse_codex_session(["not json"])
+        messages, _, _ = _parse_codex_session(["not json"])
         assert messages == []
 
     def test_full_turn(self):
@@ -577,7 +577,7 @@ class TestParseCodexSession:
             '{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Found a.txt"}]}}',
             '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":500,"output_tokens":100,"cached_input_tokens":200,"reasoning_output_tokens":0}}}}',
         ]
-        messages, usage, session_id = parse_codex_session(lines)
+        messages, usage, session_id = _parse_codex_session(lines)
         assert session_id == "thread-1"
         assert len(messages) == 4
         assert messages[0].role == "user"
