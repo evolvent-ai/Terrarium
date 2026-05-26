@@ -77,12 +77,13 @@ GOOGLE_SHEETS_CREDENTIALS_FILE=creds.json     # if using google_sheets capabilit
 
 ### Build Docker Images (optional)
 
-Sandbox-based agents (claude_code, openclaw, codex) run inside containers. Build the images you need:
+Sandbox-based agents (claude_code, openclaw, codex, hermes) run inside containers. Build the images you need:
 
 ```bash
 docker build -t terrarium/claude-code -f docker/claude-code.Dockerfile docker/
 docker build -t terrarium/openclaw -f docker/openclaw.Dockerfile docker/
 docker build -t terrarium/codex -f docker/codex.Dockerfile docker/
+docker build -t terrarium/hermes -f docker/hermes.Dockerfile docker/
 ```
 
 ### Try It
@@ -93,7 +94,7 @@ terrarium run -c demo/run_config.toml
 
 ## Built-in Agents
 
-Four agents are provided out of the box:
+Five agents are provided out of the box:
 
 
 | Agent         | Runs in    | Description                                                                         |
@@ -101,6 +102,7 @@ Four agents are provided out of the box:
 | `claude_code` | Docker     | Claude Code CLI, stream-json output, multi-turn via session ID                      |
 | `openclaw`    | Docker     | OpenClaw CLI, session JSONL output                                                  |
 | `codex`       | Docker     | OpenAI Codex CLI, session JSONL output, multi-turn via session ID                   |
+| `hermes`      | Docker     | NousResearch hermes-agent CLI, session JSONL export, multi-turn via session ID      |
 | `mini`        | In-process | Lightweight agent via litellm, supports tool registration and custom system prompts |
 
 

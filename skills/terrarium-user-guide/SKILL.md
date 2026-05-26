@@ -13,12 +13,13 @@ Terrarium is a Python framework for building living environments and running LLM
 uv sync                  # install dependencies
 ```
 
-For sandbox-based agents (claude_code, openclaw, codex), build the Docker image:
+For sandbox-based agents (claude_code, openclaw, codex, hermes), build the Docker image:
 
 ```bash
 docker build -t terrarium/claude-code -f docker/claude-code.Dockerfile docker/
 docker build -t terrarium/openclaw -f docker/openclaw.Dockerfile docker/
 docker build -t terrarium/codex -f docker/codex.Dockerfile docker/
+docker build -t terrarium/hermes -f docker/hermes.Dockerfile docker/
 ```
 
 Set environment variables in `.env` at the project root:
@@ -142,6 +143,7 @@ The job engine expands `agents x (datasets + tasks) x n_attempts` into individua
 | `claude_code` | Docker | Claude Code CLI with stream-json output |
 | `openclaw` | Docker | OpenClaw CLI with session JSONL output |
 | `codex` | Docker | OpenAI Codex CLI with session JSONL output |
+| `hermes` | Docker | NousResearch hermes-agent CLI with session JSONL export |
 | `mini` | In-process | Lightweight agent using litellm, for testing |
 
 ### Agent configuration
@@ -184,6 +186,19 @@ model_name = "gpt-5.4"                       # or "openai/gpt-5" via OpenRouter
 | kwarg | type | default | description |
 |-------|------|---------|-------------|
 | `api_key` | str | from `OPENAI_API_KEY` env | API key override |
+
+**hermes** — runs NousResearch hermes-agent CLI in Docker (`terrarium/hermes`). Requires a model config YAML file.
+
+```toml
+[[agents]]
+name = "hermes"
+model_name = "claude-sonnet-4-6"
+kwargs = { model_config_path = "./hermes_model.yaml" }
+```
+
+| kwarg | type | default | description |
+|-------|------|---------|-------------|
+| `model_config_path` | str | `""` (required) | Path to hermes model config YAML |
 
 **mini** — in-process agent using litellm. No Docker needed. Supports tool registration and custom system prompts from task code.
 
