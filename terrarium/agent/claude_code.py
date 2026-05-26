@@ -153,7 +153,7 @@ class ClaudeCodeAgent(BaseAgent):
         if result.exit_code != 0:
             logger.warning("Claude Code exit {}: {}", result.exit_code, result.stderr or "")
 
-        messages, usage = parse_stream_json(result.stdout or "")
+        messages, usage = _parse_stream_json(result.stdout or "")
         messages.insert(0, Message(role="user", content=instruction))
 
         act_result = ActResult(
@@ -254,7 +254,7 @@ class ClaudeCodeAgent(BaseAgent):
         return " ".join(parts) + " "
 
 
-def parse_stream_json(stdout: str) -> tuple[list[Message], dict[str, int]]:
+def _parse_stream_json(stdout: str) -> tuple[list[Message], dict[str, int]]:
     """Parse stream-json stdout into messages and usage totals.
 
     Two-pass: first parse and filter all JSON lines, then group consecutive
