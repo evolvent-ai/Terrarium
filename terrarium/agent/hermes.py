@@ -34,8 +34,9 @@ DEFAULT_IMAGE = "terrarium/hermes:latest"
 TERRARIUM_DIR = "/terrarium/hermes"
 CONFIG_PATH = f"{TERRARIUM_DIR}/config.yaml"
 
-HERMES_INSTALL_SCRIPT = """\
+HERMES_INSTALL_SCRIPT = f"""\
 set -e
+export HERMES_HOME={TERRARIUM_DIR}
 export DEBIAN_FRONTEND=noninteractive
 if command -v apk >/dev/null 2>&1; then
     apk add --no-cache curl bash git xz
