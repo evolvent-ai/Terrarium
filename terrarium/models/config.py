@@ -16,6 +16,13 @@ class AgentConfig(BaseModel):
     kwargs: dict[str, Any] = Field(default_factory=dict)
 
 
+class SandboxProviderConfig(BaseModel):
+    """How to create a sandbox provider."""
+    name: str = "docker"
+    import_path: str | None = None
+    kwargs: dict[str, Any] = Field(default_factory=dict)
+
+
 class TaskConfig(BaseModel):
     """Reference to a task."""
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -40,6 +47,7 @@ class TrialConfig(BaseModel):
     agent: AgentConfig
     trial_name: str
     trial_dir: Path
+    sandbox_provider: SandboxProviderConfig = Field(default_factory=SandboxProviderConfig)
     agent_setup_timeout_sec: float | None = None
     agent_exec_timeout_sec: float | None = None
 
@@ -52,6 +60,7 @@ class JobConfig(BaseModel):
     n_attempts: int = 1
     n_concurrent_trials: int = 4
     retry: RetryConfig = Field(default_factory=RetryConfig)
+    sandbox_provider: SandboxProviderConfig = Field(default_factory=SandboxProviderConfig)
     job_name: str = Field(default_factory=lambda: datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S"))
     job_dir: Path | None = None
     agent_setup_timeout_sec: float | None = None

@@ -10,7 +10,7 @@ from terrarium.models.result import (
     JobResult, JobStats, TimingInfo, TrialResult,
 )
 from terrarium.models.config import (
-    AgentConfig, JobConfig, RetryConfig, TaskConfig, TrialConfig,
+    AgentConfig, JobConfig, RetryConfig, SandboxProviderConfig, TaskConfig, TrialConfig,
 )
 from terrarium.models.spec import DatasetSpec, TaskSpec
 
@@ -20,5 +20,6 @@ __all__ = [
     "ToolResultBlock", "ToolUseBlock", "Trajectory", "TrajectoryMetrics",
     "ActResult", "AgentDatasetStats", "AgentInfo", "ExceptionInfo", "TaskInfo",
     "JobResult", "JobStats", "TimingInfo", "TrialResult",
-    "AgentConfig", "DatasetSpec", "JobConfig", "RetryConfig", "TaskConfig", "TaskSpec", "TrialConfig",
+    "AgentConfig", "DatasetSpec", "JobConfig", "RetryConfig", "SandboxProviderConfig",
+    "TaskConfig", "TaskSpec", "TrialConfig",
 ]

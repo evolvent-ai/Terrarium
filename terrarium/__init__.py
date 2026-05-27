@@ -6,9 +6,9 @@ load_dotenv()
 from terrarium.models import (
     AgentConfig, AgentDatasetStats, AgentInfo, ActResult, Check,
     CheckerResults, ContentBlock, DatasetSpec, ExceptionInfo, JobConfig, JobResult, JobStats,
-    Message, RetryConfig, TaskConfig, TaskInfo, TaskSpec, TextBlock, ThinkingBlock, TimingInfo,
-    ToolResultBlock, ToolUseBlock, Trajectory, TrajectoryMetrics,
-    TrialConfig, TrialResult,
+    Message, RetryConfig, SandboxProviderConfig, TaskConfig, TaskInfo, TaskSpec,
+    TextBlock, ThinkingBlock, TimingInfo, ToolResultBlock, ToolUseBlock,
+    Trajectory, TrajectoryMetrics, TrialConfig, TrialResult,
 )
 # Agent
 from terrarium.agent.base import BaseAgent
@@ -24,6 +24,8 @@ from terrarium.task.checking import run_checkers, aggregate_results
 from terrarium.task.task import Task
 # Dataset
 from terrarium.dataset.dataset import Dataset
+# Environment providers
+from terrarium.environment.providers.registry import create_sandbox_provider
 # Execution
 from terrarium.execution.trial import Trial
 from terrarium.execution.job import Job
@@ -37,10 +39,12 @@ __all__ = [
     "AgentConfig", "AgentDatasetStats", "AgentInfo", "ActResult",
     "Check", "CheckerResults", "ContentBlock", "DatasetSpec", "ExceptionInfo",
     "JobConfig", "JobResult", "JobStats",
-    "Message", "RetryConfig", "TaskConfig", "TaskInfo", "TaskSpec", "TextBlock", "ThinkingBlock",
+    "Message", "RetryConfig", "SandboxProviderConfig", "TaskConfig", "TaskInfo", "TaskSpec",
+    "TextBlock", "ThinkingBlock",
     "TimingInfo", "ToolResultBlock", "ToolUseBlock",
     "Trajectory", "TrajectoryMetrics", "TrialConfig", "TrialResult",
     "BaseAgent", "create_agent", "ClaudeCodeAgent", "CodexAgent", "HermesAgent", "MiniAgent", "OpenClawAgent",
+    "create_sandbox_provider",
     "entry", "run_checkers", "aggregate_results", "Task",
     "Dataset",
     "Trial", "Job",

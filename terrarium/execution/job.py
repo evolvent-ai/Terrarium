@@ -107,6 +107,7 @@ class Job:
                         agent=agent_cfg,
                         trial_name=trial_name,
                         trial_dir=self._config.job_dir / trial_name,
+                        sandbox_provider=self._config.sandbox_provider,
                         agent_setup_timeout_sec=self._config.agent_setup_timeout_sec,
                         agent_exec_timeout_sec=self._config.agent_exec_timeout_sec,
                     ))
