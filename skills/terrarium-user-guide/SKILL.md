@@ -226,6 +226,53 @@ import_path = "my_package.agent:MyAgent"
 
 `model_name` is passed as the `model` kwarg to the agent constructor. All other `kwargs` are passed through directly.
 
+## Sandbox Providers
+
+Capabilities and containerized agents run inside sandboxes provisioned by a `SandboxProvider`. The provider is selected per-job through `sandbox_provider` and propagates to every Trial the Job expands.
+
+### Built-in providers
+
+| Name | Backend | Notes |
+|------|---------|-------|
+| `docker` | Local Docker daemon (default) | One container per sandbox on a per-session Docker network. |
+| `k8s` | Kubernetes cluster | One Pod per sandbox in a shared namespace. |
+
+### Provider configuration
+
+**docker** — default backend, talks to the local Docker daemon. No configuration needed for Docker Desktop / a local daemon.
+
+```toml
+[sandbox_provider]
+name = "docker"
+kwargs = { external_network = "shared-net" }  # optional
+```
+
+| kwarg | type | default | description |
+|-------|------|---------|-------------|
+| `external_network` | str | None | Join an existing Docker network instead of creating a per-session one. |
+
+**k8s** — runs sandboxes as Pods in a Kubernetes cluster. Requires a kubeconfig the driver can use and an existing namespace.
+
+```toml
+[sandbox_provider]
+name = "k8s"
+kwargs = { namespace = "terrarium" }
+```
+
+| kwarg | type | default | description |
+|-------|------|---------|-------------|
+| `namespace` | str | (required) | Namespace pods are created in. Must exist; provider does not auto-create. |
+| `kubeconfig` | str | None | Path to a kubeconfig file. Falls back to `KUBECONFIG` env var or `~/.kube/config`. |
+
+**Custom provider** — implement any class extending `SandboxProvider`:
+
+```toml
+[sandbox_provider]
+import_path = "my_package.providers:MyProvider"
+```
+
+`kwargs` is forwarded directly to the provider constructor.
+
 ## Dataset Configuration
 
 A dataset is a directory with `dataset.toml` and subdirectories each containing a task:
