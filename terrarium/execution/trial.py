@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from loguru import logger
 
 from terrarium.environment.environment import ComposableEnvironment
+from terrarium.environment.providers.registry import create_sandbox_provider
 from terrarium.agent.base import BaseAgent
 from terrarium.agent.registry import create_agent
 from terrarium.models.checker import CheckerResults
@@ -140,7 +141,8 @@ class Trial:
             # Agents provision themselves in setup() if the task-chosen image
             # doesn't already have what they need.
             caps_config["workspace"] = {**ws_config, **caps_config.get("workspace", {})}
-        return ComposableEnvironment(capabilities=capabilities, config=caps_config)
+        provider = create_sandbox_provider(self._config.sandbox_provider)
+        return ComposableEnvironment(capabilities=capabilities, provider=provider, config=caps_config)
 
     def _collect_conn_info(self, env: ComposableEnvironment) -> dict:
         conn_info: dict = {}

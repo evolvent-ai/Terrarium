@@ -7,6 +7,7 @@ from terrarium.models.config import (
     AgentConfig,
     JobConfig,
     RetryConfig,
+    SandboxProviderConfig,
     TaskConfig,
     TrialConfig,
 )
@@ -30,6 +31,24 @@ class TestAgentConfig:
         assert cfg.import_path == "mypackage.agents.GptAgent"
         assert cfg.model_name == "gpt-4o"
         assert cfg.kwargs["temperature"] == 0.7
+
+
+class TestSandboxProviderConfig:
+    def test_defaults(self):
+        cfg = SandboxProviderConfig()
+        assert cfg.name == "docker"
+        assert cfg.import_path is None
+        assert cfg.kwargs == {}
+
+    def test_full(self):
+        cfg = SandboxProviderConfig(
+            name="k8s",
+            import_path="my_pkg.providers:K8sProvider",
+            kwargs={"namespace": "terrarium", "kubeconfig": "/tmp/kc"},
+        )
+        assert cfg.name == "k8s"
+        assert cfg.import_path == "my_pkg.providers:K8sProvider"
+        assert cfg.kwargs["namespace"] == "terrarium"
 
 
 class TestTaskConfig:
