@@ -283,10 +283,13 @@ class KubernetesSandboxProvider(SandboxProvider):
 
         ports = [client.V1ContainerPort(container_port=p) for p in spec.ports]
         env = [client.V1EnvVar(name=k, value=v) for k, v in (spec.env or {}).items()]
+        deferred_uploads: list[tuple[str, str]] = []
         if spec.volumes:
-            raise ProviderError(
-                "K8s provider does not support SandboxSpec.volumes when the driver runs "
-                "outside the cluster; use sandbox.upload() after the pod starts instead"
+            for vol in spec.volumes:
+                deferred_uploads.append((vol.source, vol.target))
+            logger.info(
+                "K8s provider will upload {} volume(s) after pod starts",
+                len(deferred_uploads),
             )
         args: list[str] | None = None
         if isinstance(spec.command, str):
@@ -348,6 +351,12 @@ class KubernetesSandboxProvider(SandboxProvider):
 
         sandbox = KubernetesSandbox(self._v1, created)
         self._sandboxes.append(sandbox)
+
+        # Upload deferred volumes (converted from SandboxSpec.volumes)
+        for local_path, sandbox_path in deferred_uploads:
+            logger.info("Uploading volume {} -> {}", local_path, sandbox_path)
+            sandbox.upload(local_path, sandbox_path)
+
         return sandbox
 
     def teardown(self) -> None:
