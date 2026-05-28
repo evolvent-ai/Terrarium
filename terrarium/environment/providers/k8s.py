@@ -240,7 +240,13 @@ class KubernetesSandboxProvider(SandboxProvider):
 
     def setup(self) -> None:
         try:
-            config.load_kube_config(config_file=self._kubeconfig)
+            if self._kubeconfig:
+                config.load_kube_config(config_file=self._kubeconfig)
+            else:
+                try:
+                    config.load_incluster_config()
+                except config.ConfigException:
+                    config.load_kube_config()
         except Exception as e:
             raise ProviderError(f"Failed to load kubeconfig: {e}") from e
         self._v1 = client.CoreV1Api()
