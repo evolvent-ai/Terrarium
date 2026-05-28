@@ -2,6 +2,7 @@
 from __future__ import annotations
 import importlib
 
+from terrarium.environment.providers.data_produce import DataProduceSandboxProvider
 from terrarium.environment.providers.docker import DockerSandboxProvider
 from terrarium.environment.providers.k8s import KubernetesSandboxProvider
 from terrarium.environment.sandbox import SandboxProvider
@@ -10,6 +11,7 @@ from terrarium.models.config import SandboxProviderConfig
 _PROVIDERS: dict[str, type[SandboxProvider]] = {
     "docker": DockerSandboxProvider,
     "k8s": KubernetesSandboxProvider,
+    "data-produce": DataProduceSandboxProvider,
 }
 
 
