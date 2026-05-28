@@ -73,21 +73,21 @@ class TestKubernetesSandbox:
         sandbox, _ = self._make_sandbox()
         assert sandbox.hostname() == "cap.terrarium-abc"
 
-    @patch("terrarium.environment.providers.k8s.exec_stream")
+    @patch("terrarium.environment.providers.k8s.stream")
     def test_exec_str_uses_shlex_split(self, mock_exec):
         sandbox, _ = self._make_sandbox()
         mock_exec.return_value = _FakeWSResp(stdout=b"out")
         sandbox.exec("echo hello world")
         assert mock_exec.call_args.kwargs["command"] == ["echo", "hello", "world"]
 
-    @patch("terrarium.environment.providers.k8s.exec_stream")
+    @patch("terrarium.environment.providers.k8s.stream")
     def test_exec_list_passes_through(self, mock_exec):
         sandbox, _ = self._make_sandbox()
         mock_exec.return_value = _FakeWSResp()
         sandbox.exec(["python", "-c", "print(1)"])
         assert mock_exec.call_args.kwargs["command"] == ["python", "-c", "print(1)"]
 
-    @patch("terrarium.environment.providers.k8s.exec_stream")
+    @patch("terrarium.environment.providers.k8s.stream")
     def test_exec_env_prefixes_env_binary(self, mock_exec):
         sandbox, _ = self._make_sandbox()
         mock_exec.return_value = _FakeWSResp()
@@ -97,21 +97,21 @@ class TestKubernetesSandbox:
         assert "A=1" in cmd and "B=2" in cmd
         assert cmd[-1] == "app"
 
-    @patch("terrarium.environment.providers.k8s.exec_stream")
+    @patch("terrarium.environment.providers.k8s.stream")
     def test_exec_user_uses_runuser(self, mock_exec):
         sandbox, _ = self._make_sandbox()
         mock_exec.return_value = _FakeWSResp()
         sandbox.exec(["whoami"], user="root")
         assert mock_exec.call_args.kwargs["command"] == ["runuser", "-u", "root", "--", "whoami"]
 
-    @patch("terrarium.environment.providers.k8s.exec_stream")
+    @patch("terrarium.environment.providers.k8s.stream")
     def test_exec_user_int_stringified(self, mock_exec):
         sandbox, _ = self._make_sandbox()
         mock_exec.return_value = _FakeWSResp()
         sandbox.exec(["whoami"], user=1000)
         assert mock_exec.call_args.kwargs["command"][:4] == ["runuser", "-u", "1000", "--"]
 
-    @patch("terrarium.environment.providers.k8s.exec_stream")
+    @patch("terrarium.environment.providers.k8s.stream")
     def test_exec_decodes_stdout_stderr(self, mock_exec):
         sandbox, _ = self._make_sandbox()
         mock_exec.return_value = _FakeWSResp(stdout=b"out\n", stderr=b"err\n", returncode=3)
@@ -120,7 +120,7 @@ class TestKubernetesSandbox:
         assert result.stderr == "err\n"
         assert result.exit_code == 3
 
-    @patch("terrarium.environment.providers.k8s.exec_stream")
+    @patch("terrarium.environment.providers.k8s.stream")
     def test_exec_timeout_raises(self, mock_exec):
         sandbox, _ = self._make_sandbox()
         forever = _FakeWSResp()
@@ -129,7 +129,7 @@ class TestKubernetesSandbox:
         with pytest.raises(SandboxError, match="timed out"):
             sandbox.exec(["sleep", "10"], timeout=0.01)
 
-    @patch("terrarium.environment.providers.k8s.exec_stream")
+    @patch("terrarium.environment.providers.k8s.stream")
     def test_read_file(self, mock_exec):
         sandbox, _ = self._make_sandbox()
         mock_exec.return_value = _FakeWSResp(stdout=b"file-content")
@@ -137,14 +137,14 @@ class TestKubernetesSandbox:
         assert data == b"file-content"
         assert mock_exec.call_args.kwargs["command"] == ["cat", "/tmp/x"]
 
-    @patch("terrarium.environment.providers.k8s.exec_stream")
+    @patch("terrarium.environment.providers.k8s.stream")
     def test_read_file_nonzero_raises(self, mock_exec):
         sandbox, _ = self._make_sandbox()
         mock_exec.return_value = _FakeWSResp(stderr=b"no such file", returncode=1)
         with pytest.raises(SandboxError, match="Failed to read"):
             sandbox.read_file("/missing")
 
-    @patch("terrarium.environment.providers.k8s.exec_stream")
+    @patch("terrarium.environment.providers.k8s.stream")
     def test_write_file_sends_stdin_and_closes_channel(self, mock_exec):
         sandbox, _ = self._make_sandbox()
         resp = _FakeWSResp()
@@ -156,14 +156,14 @@ class TestKubernetesSandbox:
         assert resp.stdin_writes == [b"payload"]
         assert resp.closed_channels == [0]
 
-    @patch("terrarium.environment.providers.k8s.exec_stream")
+    @patch("terrarium.environment.providers.k8s.stream")
     def test_write_file_raises_when_subprotocol_not_v5(self, mock_exec):
         sandbox, _ = self._make_sandbox()
         mock_exec.return_value = _FakeWSResp(subprotocol="v4.channel.k8s.io")
         with pytest.raises(SandboxError, match="v5.channel.k8s.io"):
             sandbox.write_file("/tmp/x", b"data")
 
-    @patch("terrarium.environment.providers.k8s.exec_stream")
+    @patch("terrarium.environment.providers.k8s.stream")
     def test_upload_streams_tar(self, mock_exec, tmp_path):
         (tmp_path / "script.sh").write_text("echo hi\n")
         sandbox, _ = self._make_sandbox()
@@ -181,7 +181,7 @@ class TestKubernetesSandbox:
             assert members[0].uid == 0
             assert members[0].uname == ""
 
-    @patch("terrarium.environment.providers.k8s.exec_stream")
+    @patch("terrarium.environment.providers.k8s.stream")
     def test_download_extracts_file(self, mock_exec, tmp_path):
         # Build a tar archive as if produced by pod-side `tar cf - -C /src file.txt`
         tar_stream = io.BytesIO()
@@ -213,32 +213,32 @@ class TestKubernetesSandbox:
 
 
 class TestKubernetesSandboxProvider:
-    @patch("terrarium.environment.providers.k8s.kconfig")
+    @patch("terrarium.environment.providers.k8s.config")
     @patch("terrarium.environment.providers.k8s.client")
-    def test_setup_loads_kubeconfig(self, mock_client, mock_kconfig):
+    def test_setup_loads_kubeconfig(self, mock_client, mock_config):
         provider = KubernetesSandboxProvider(namespace="terrarium", kubeconfig="/tmp/kc")
         provider.setup()
-        mock_kconfig.load_kube_config.assert_called_once_with(config_file="/tmp/kc")
+        mock_config.load_kube_config.assert_called_once_with(config_file="/tmp/kc")
 
-    @patch("terrarium.environment.providers.k8s.kconfig")
+    @patch("terrarium.environment.providers.k8s.config")
     @patch("terrarium.environment.providers.k8s.client")
-    def test_setup_raises_on_kubeconfig_failure(self, mock_client, mock_kconfig):
-        mock_kconfig.load_kube_config.side_effect = RuntimeError("bad config")
+    def test_setup_raises_on_kubeconfig_failure(self, mock_client, mock_config):
+        mock_config.load_kube_config.side_effect = RuntimeError("bad config")
         with pytest.raises(ProviderError, match="kubeconfig"):
             KubernetesSandboxProvider(namespace="terrarium").setup()
 
-    @patch("terrarium.environment.providers.k8s.kconfig")
+    @patch("terrarium.environment.providers.k8s.config")
     @patch("terrarium.environment.providers.k8s.client")
-    def test_setup_raises_when_namespace_missing(self, mock_client, mock_kconfig):
+    def test_setup_raises_when_namespace_missing(self, mock_client, mock_config):
         v1 = MagicMock()
         v1.read_namespace.side_effect = RuntimeError("not found")
         mock_client.CoreV1Api.return_value = v1
         with pytest.raises(ProviderError, match="not accessible"):
             KubernetesSandboxProvider(namespace="missing").setup()
 
-    @patch("terrarium.environment.providers.k8s.kconfig")
+    @patch("terrarium.environment.providers.k8s.config")
     @patch("terrarium.environment.providers.k8s.client")
-    def test_setup_creates_headless_service(self, mock_client, mock_kconfig):
+    def test_setup_creates_headless_service(self, mock_client, mock_config):
         v1 = MagicMock()
         mock_client.CoreV1Api.return_value = v1
         provider = KubernetesSandboxProvider(namespace="terrarium")
@@ -253,18 +253,18 @@ class TestKubernetesSandboxProvider:
         assert svc_spec_kwargs["publish_not_ready_addresses"] is True
         assert svc_spec_kwargs["selector"] == {"terrarium-session": provider._session_id}
 
-    @patch("terrarium.environment.providers.k8s.kconfig")
+    @patch("terrarium.environment.providers.k8s.config")
     @patch("terrarium.environment.providers.k8s.client")
-    def test_create_raises_when_image_has_build(self, mock_client, mock_kconfig, tmp_path):
+    def test_create_raises_when_image_has_build(self, mock_client, mock_config, tmp_path):
         (tmp_path / "Dockerfile").write_text("FROM alpine\n")
         provider = KubernetesSandboxProvider(namespace="terrarium")
         provider.setup()
         with pytest.raises(ProviderError, match="ImageSpec.build"):
             provider.create(SandboxSpec(image=ImageSpec(build=BuildSpec(context=str(tmp_path)))))
 
-    @patch("terrarium.environment.providers.k8s.kconfig")
+    @patch("terrarium.environment.providers.k8s.config")
     @patch("terrarium.environment.providers.k8s.client")
-    def test_create_raises_on_volumes(self, mock_client, mock_kconfig):
+    def test_create_raises_on_volumes(self, mock_client, mock_config):
         provider = KubernetesSandboxProvider(namespace="terrarium")
         provider.setup()
         with pytest.raises(ProviderError, match="volumes"):
@@ -273,9 +273,9 @@ class TestKubernetesSandboxProvider:
                 volumes=[VolumeMount(source="/host", target="/mnt")],
             ))
 
-    @patch("terrarium.environment.providers.k8s.kconfig")
+    @patch("terrarium.environment.providers.k8s.config")
     @patch("terrarium.environment.providers.k8s.client")
-    def test_create_sets_hostname_subdomain_and_labels(self, mock_client, mock_kconfig):
+    def test_create_sets_hostname_subdomain_and_labels(self, mock_client, mock_config):
         v1 = MagicMock()
         v1.read_namespaced_pod.return_value = _make_pod()
         mock_client.CoreV1Api.return_value = v1
@@ -295,9 +295,9 @@ class TestKubernetesSandboxProvider:
             "terrarium-capability": "postgres",
         }
 
-    @patch("terrarium.environment.providers.k8s.kconfig")
+    @patch("terrarium.environment.providers.k8s.config")
     @patch("terrarium.environment.providers.k8s.client")
-    def test_create_forwards_resources(self, mock_client, mock_kconfig):
+    def test_create_forwards_resources(self, mock_client, mock_config):
         v1 = MagicMock()
         v1.read_namespaced_pod.return_value = _make_pod()
         mock_client.CoreV1Api.return_value = v1
@@ -312,9 +312,9 @@ class TestKubernetesSandboxProvider:
         limits = mock_client.V1ResourceRequirements.call_args.kwargs["limits"]
         assert limits == {"cpu": "1.5", "memory": "2G", "ephemeral-storage": "10G"}
 
-    @patch("terrarium.environment.providers.k8s.kconfig")
+    @patch("terrarium.environment.providers.k8s.config")
     @patch("terrarium.environment.providers.k8s.client")
-    def test_create_raises_when_pod_phase_terminal(self, mock_client, mock_kconfig):
+    def test_create_raises_when_pod_phase_terminal(self, mock_client, mock_config):
         v1 = MagicMock()
         failed_pod = _make_pod()
         failed_pod.status.phase = "Failed"
@@ -326,9 +326,9 @@ class TestKubernetesSandboxProvider:
         with pytest.raises(ProviderError, match="terminal phase"):
             provider.create(SandboxSpec(image=ImageSpec(name="alpine")))
 
-    @patch("terrarium.environment.providers.k8s.kconfig")
+    @patch("terrarium.environment.providers.k8s.config")
     @patch("terrarium.environment.providers.k8s.client")
-    def test_teardown_deletes_pods_and_service(self, mock_client, mock_kconfig):
+    def test_teardown_deletes_pods_and_service(self, mock_client, mock_config):
         v1 = MagicMock()
         v1.read_namespaced_pod.return_value = _make_pod()
         mock_client.CoreV1Api.return_value = v1

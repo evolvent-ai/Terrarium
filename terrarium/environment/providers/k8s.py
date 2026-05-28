@@ -13,8 +13,8 @@ import threading
 import time
 import uuid
 
-from kubernetes import client, config as kconfig
-from kubernetes.stream import stream as exec_stream, portforward
+from kubernetes import client, config
+from kubernetes.stream import stream, portforward
 from loguru import logger
 
 from terrarium.environment.exceptions import ProviderError, SandboxError
@@ -98,7 +98,7 @@ class KubernetesSandbox(Sandbox):
 
     def _exec_capture(self, argv: list[str], stdin: bytes | None = None, timeout: float | None = None) -> tuple[int, bytes, bytes]:
         """Run argv in the pod, capture stdout/stderr as bytes, optionally piping stdin."""
-        resp = exec_stream(
+        resp = stream(
             self._v1.connect_get_namespaced_pod_exec,
             self._pod.metadata.name, self._pod.metadata.namespace,
             command=argv,
@@ -240,7 +240,7 @@ class KubernetesSandboxProvider(SandboxProvider):
 
     def setup(self) -> None:
         try:
-            kconfig.load_kube_config(config_file=self._kubeconfig)
+            config.load_kube_config(config_file=self._kubeconfig)
         except Exception as e:
             raise ProviderError(f"Failed to load kubeconfig: {e}") from e
         self._v1 = client.CoreV1Api()
