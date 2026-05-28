@@ -231,10 +231,11 @@ class _PortForward:
 class KubernetesSandboxProvider(SandboxProvider):
     """Kubernetes backend — one Pod per sandbox, one headless Service per session."""
 
-    def __init__(self, namespace: str, kubeconfig: str | None = None):
+    def __init__(self, namespace: str, kubeconfig: str | None = None, image_pull_secrets: list[str] | None = None):
         self._v1: client.CoreV1Api | None = None
         self._namespace = namespace
         self._kubeconfig = kubeconfig
+        self._image_pull_secrets = image_pull_secrets or []
         self._sandboxes: list[KubernetesSandbox] = []
         self._session_id = uuid.uuid4().hex[:12]
 
@@ -329,6 +330,9 @@ class KubernetesSandboxProvider(SandboxProvider):
                 subdomain=f"terrarium-{self._session_id}",
                 containers=[container],
                 restart_policy="Never",
+                image_pull_secrets=[
+                    client.V1LocalObjectReference(name=s) for s in self._image_pull_secrets
+                ] if self._image_pull_secrets else None,
             ),
         )
 
