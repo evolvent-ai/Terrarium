@@ -279,7 +279,9 @@ class KubernetesSandboxProvider(SandboxProvider):
     def create(self, spec: SandboxSpec) -> Sandbox:
         image_name = self._resolve_image(spec.image)
         capability_name = spec.name or uuid.uuid4().hex[:6]
-        pod_name = f"terrarium-{self._session_id}-{capability_name}"
+        # K8s names must be lowercase RFC-1123: [a-z0-9-]
+        safe_name = capability_name.replace("_", "-").lower()
+        pod_name = f"terrarium-{self._session_id}-{safe_name}"
 
         ports = [client.V1ContainerPort(container_port=p) for p in spec.ports]
         env = [client.V1EnvVar(name=k, value=v) for k, v in (spec.env or {}).items()]
@@ -319,11 +321,11 @@ class KubernetesSandboxProvider(SandboxProvider):
                 name=pod_name,
                 labels={
                     "terrarium-session": self._session_id,
-                    "terrarium-capability": capability_name,
+                    "terrarium-capability": safe_name,
                 },
             ),
             spec=client.V1PodSpec(
-                hostname=capability_name,
+                hostname=safe_name,
                 subdomain=f"terrarium-{self._session_id}",
                 containers=[container],
                 restart_policy="Never",
