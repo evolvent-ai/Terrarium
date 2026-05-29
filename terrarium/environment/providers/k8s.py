@@ -139,7 +139,8 @@ class KubernetesSandbox(Sandbox):
         return "127.0.0.1", pf.local_port
 
     def hostname(self) -> str:
-        return f"{self._pod.spec.hostname}.{self._pod.spec.subdomain}"
+        ns = self._pod.metadata.namespace
+        return f"{self._pod.spec.hostname}.{self._pod.spec.subdomain}.{ns}.svc.cluster.local"
 
     def stop(self) -> None:
         for pf in self._portforwards:
