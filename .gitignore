@@ -12,3 +12,6 @@ oauth_credentials.json
 .claude/
 docs/
 scratch/
+
+.idea/
+issues/
