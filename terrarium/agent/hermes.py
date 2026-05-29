@@ -33,7 +33,7 @@ from terrarium.models.trajectory import (
 import os as _os
 _AGENT_IMAGE_PREFIX = _os.environ.get("IMAGE_REGISTRY_PREFIX", "")
 DEFAULT_IMAGE = f"{_AGENT_IMAGE_PREFIX}/vab-hermes:latest" if _AGENT_IMAGE_PREFIX else "terrarium/hermes:latest"
-TERRARIUM_DIR = "/vab-hermes"
+TERRARIUM_DIR = "/terrarium/hermes"
 CONFIG_PATH = f"{TERRARIUM_DIR}/config.yaml"
 
 HERMES_INSTALL_SCRIPT = f"""\

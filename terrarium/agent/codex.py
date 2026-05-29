@@ -33,7 +33,7 @@ from terrarium.models.trajectory import (
 import os as _os
 _AGENT_IMAGE_PREFIX = _os.environ.get("IMAGE_REGISTRY_PREFIX", "")
 DEFAULT_IMAGE = f"{_AGENT_IMAGE_PREFIX}/vab-codex:latest" if _AGENT_IMAGE_PREFIX else "terrarium/codex:latest"
-TERRARIUM_DIR = "/vab-codex"
+TERRARIUM_DIR = "/terrarium/codex"
 SESSION_DIR = f"{TERRARIUM_DIR}/sessions"
 
 CODEX_INSTALL_SCRIPT = """\
