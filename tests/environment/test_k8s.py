@@ -71,7 +71,7 @@ class TestKubernetesSandbox:
 
     def test_hostname_combines_pod_spec(self):
         sandbox, _ = self._make_sandbox()
-        assert sandbox.hostname() == "cap.terrarium-abc"
+        assert sandbox.hostname() == "cap.terrarium-abc.terrarium.svc"
 
     @patch("terrarium.environment.providers.k8s.stream")
     def test_exec_str_uses_shlex_split(self, mock_exec):
@@ -218,14 +218,14 @@ class TestKubernetesSandboxProvider:
     def test_setup_loads_kubeconfig(self, mock_client, mock_config):
         provider = KubernetesSandboxProvider(namespace="terrarium", kubeconfig="/tmp/kc")
         provider.setup()
-        mock_config.load_kube_config.assert_called_once_with(config_file="/tmp/kc")
+        mock_config.load_config.assert_called_once_with(config_file="/tmp/kc")
 
     @patch("terrarium.environment.providers.k8s.config")
     @patch("terrarium.environment.providers.k8s.client")
     def test_setup_raises_on_kubeconfig_failure(self, mock_client, mock_config):
-        mock_config.load_kube_config.side_effect = RuntimeError("bad config")
-        with pytest.raises(ProviderError, match="kubeconfig"):
-            KubernetesSandboxProvider(namespace="terrarium").setup()
+        mock_config.load_config.side_effect = RuntimeError("bad config")
+        with pytest.raises(ProviderError, match="Kubernetes config"):
+            KubernetesSandboxProvider(namespace="terrarium", kubeconfig="/tmp/kc").setup()
 
     @patch("terrarium.environment.providers.k8s.config")
     @patch("terrarium.environment.providers.k8s.client")

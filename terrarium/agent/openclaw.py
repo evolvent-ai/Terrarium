@@ -15,7 +15,7 @@ from pathlib import Path
 
 from loguru import logger
 
-from terrarium.agent.base import BaseAgent
+from terrarium.agent.base import BaseAgent, agent_image
 from terrarium.models.mcp import MCPServerConfig
 from terrarium.models.result import ActResult
 from terrarium.models.trajectory import (
@@ -29,9 +29,7 @@ from terrarium.models.trajectory import (
     TrajectoryMetrics,
 )
 
-import os as _os
-_AGENT_IMAGE_PREFIX = _os.environ.get("IMAGE_REGISTRY_PREFIX", "")
-DEFAULT_IMAGE = f"{_AGENT_IMAGE_PREFIX}/vab-openclaw:latest" if _AGENT_IMAGE_PREFIX else "terrarium/openclaw:latest"
+DEFAULT_IMAGE = agent_image("terrarium/openclaw:latest")
 TERRARIUM_DIR = "/terrarium/openclaw"
 SESSION_DIR = f"{TERRARIUM_DIR}/agents/main/sessions"
 CONFIG_PATH = f"{TERRARIUM_DIR}/openclaw.json"

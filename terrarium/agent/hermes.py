@@ -16,7 +16,7 @@ from typing import Any
 import yaml
 from loguru import logger
 
-from terrarium.agent.base import BaseAgent
+from terrarium.agent.base import BaseAgent, agent_image
 from terrarium.models.mcp import MCPServerConfig
 from terrarium.models.result import ActResult
 from terrarium.models.trajectory import (
@@ -30,9 +30,7 @@ from terrarium.models.trajectory import (
     TrajectoryMetrics,
 )
 
-import os as _os
-_AGENT_IMAGE_PREFIX = _os.environ.get("IMAGE_REGISTRY_PREFIX", "")
-DEFAULT_IMAGE = f"{_AGENT_IMAGE_PREFIX}/vab-hermes:latest" if _AGENT_IMAGE_PREFIX else "terrarium/hermes:latest"
+DEFAULT_IMAGE = agent_image("terrarium/hermes:latest")
 TERRARIUM_DIR = "/terrarium/hermes"
 CONFIG_PATH = f"{TERRARIUM_DIR}/config.yaml"
 

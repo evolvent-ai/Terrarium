@@ -16,7 +16,7 @@ from pathlib import Path
 import tomli_w
 from loguru import logger
 
-from terrarium.agent.base import BaseAgent
+from terrarium.agent.base import BaseAgent, agent_image
 from terrarium.models.mcp import MCPServerConfig
 from terrarium.models.result import ActResult
 from terrarium.models.trajectory import (
@@ -30,9 +30,7 @@ from terrarium.models.trajectory import (
     TrajectoryMetrics,
 )
 
-import os as _os
-_AGENT_IMAGE_PREFIX = _os.environ.get("IMAGE_REGISTRY_PREFIX", "")
-DEFAULT_IMAGE = f"{_AGENT_IMAGE_PREFIX}/vab-codex:latest" if _AGENT_IMAGE_PREFIX else "terrarium/codex:latest"
+DEFAULT_IMAGE = agent_image("terrarium/codex:latest")
 TERRARIUM_DIR = "/terrarium/codex"
 SESSION_DIR = f"{TERRARIUM_DIR}/sessions"
 

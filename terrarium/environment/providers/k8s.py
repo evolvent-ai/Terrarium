@@ -139,8 +139,7 @@ class KubernetesSandbox(Sandbox):
         return "127.0.0.1", pf.local_port
 
     def hostname(self) -> str:
-        ns = self._pod.metadata.namespace
-        return f"{self._pod.spec.hostname}.{self._pod.spec.subdomain}.{ns}.svc.cluster.local"
+        return f"{self._pod.spec.hostname}.{self._pod.spec.subdomain}.{self._pod.metadata.namespace}.svc"
 
     def stop(self) -> None:
         for pf in self._portforwards:
@@ -236,21 +235,18 @@ class KubernetesSandboxProvider(SandboxProvider):
         self._v1: client.CoreV1Api | None = None
         self._namespace = namespace
         self._kubeconfig = kubeconfig
-        self._image_pull_secrets = image_pull_secrets or []
+        self._image_pull_secrets = image_pull_secrets
         self._sandboxes: list[KubernetesSandbox] = []
         self._session_id = uuid.uuid4().hex[:12]
 
     def setup(self) -> None:
         try:
             if self._kubeconfig:
-                config.load_kube_config(config_file=self._kubeconfig)
+                config.load_config(config_file=self._kubeconfig)
             else:
-                try:
-                    config.load_incluster_config()
-                except config.ConfigException:
-                    config.load_kube_config()
+                config.load_config()
         except Exception as e:
-            raise ProviderError(f"Failed to load kubeconfig: {e}") from e
+            raise ProviderError(f"Failed to load Kubernetes config: {e}") from e
         self._v1 = client.CoreV1Api()
 
         try:
@@ -280,10 +276,9 @@ class KubernetesSandboxProvider(SandboxProvider):
 
     def create(self, spec: SandboxSpec) -> Sandbox:
         image_name = self._resolve_image(spec.image)
-        capability_name = spec.name or uuid.uuid4().hex[:6]
-        # K8s names must be lowercase RFC-1123: [a-z0-9-]
-        safe_name = capability_name.replace("_", "-").lower()
-        pod_name = f"terrarium-{self._session_id}-{safe_name}"
+        # sanitize for k8s pod/hostname
+        capability_name = spec.name.replace("_", "-").lower() if spec.name else uuid.uuid4().hex[:6]
+        pod_name = f"terrarium-{self._session_id}-{capability_name}"
 
         ports = [client.V1ContainerPort(container_port=p) for p in spec.ports]
         env = [client.V1EnvVar(name=k, value=v) for k, v in (spec.env or {}).items()]
@@ -320,11 +315,11 @@ class KubernetesSandboxProvider(SandboxProvider):
                 name=pod_name,
                 labels={
                     "terrarium-session": self._session_id,
-                    "terrarium-capability": safe_name,
+                    "terrarium-capability": capability_name,
                 },
             ),
             spec=client.V1PodSpec(
-                hostname=safe_name,
+                hostname=capability_name,
                 subdomain=f"terrarium-{self._session_id}",
                 containers=[container],
                 restart_policy="Never",
@@ -355,7 +350,6 @@ class KubernetesSandboxProvider(SandboxProvider):
 
         sandbox = KubernetesSandbox(self._v1, created)
         self._sandboxes.append(sandbox)
-
         return sandbox
 
     def teardown(self) -> None:

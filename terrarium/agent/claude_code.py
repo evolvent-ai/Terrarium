@@ -17,7 +17,7 @@ from typing import Any
 
 from loguru import logger
 
-from terrarium.agent.base import BaseAgent
+from terrarium.agent.base import BaseAgent, agent_image
 from terrarium.models.mcp import MCPServerConfig
 from terrarium.models.result import ActResult
 from terrarium.models.trajectory import (
@@ -31,9 +31,7 @@ from terrarium.models.trajectory import (
     TrajectoryMetrics,
 )
 
-import os as _os
-_AGENT_IMAGE_PREFIX = _os.environ.get("IMAGE_REGISTRY_PREFIX", "")
-DEFAULT_IMAGE = f"{_AGENT_IMAGE_PREFIX}/vab-claude-code:latest" if _AGENT_IMAGE_PREFIX else "terrarium/claude-code:latest"
+DEFAULT_IMAGE = agent_image("terrarium/claude-code:latest")
 TERRARIUM_DIR = "/terrarium/claude_code"
 
 CLAUDE_INSTALL_SCRIPT = """\
