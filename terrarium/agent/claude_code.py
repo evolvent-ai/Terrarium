@@ -33,7 +33,7 @@ from terrarium.models.trajectory import (
 
 import os as _os
 _AGENT_IMAGE_PREFIX = _os.environ.get("IMAGE_REGISTRY_PREFIX", "")
-DEFAULT_IMAGE = f"{_AGENT_IMAGE_PREFIX}/vab-claude-code:latest" if _AGENT_IMAGE_PREFIX else "vab-claude-code:latest"
+DEFAULT_IMAGE = f"{_AGENT_IMAGE_PREFIX}/vab-claude-code:latest" if _AGENT_IMAGE_PREFIX else "terrarium/claude-code:latest"
 TERRARIUM_DIR = "/terrarium/claude_code"
 
 CLAUDE_INSTALL_SCRIPT = """\

@@ -31,7 +31,7 @@ from terrarium.models.trajectory import (
 
 import os as _os
 _AGENT_IMAGE_PREFIX = _os.environ.get("IMAGE_REGISTRY_PREFIX", "")
-DEFAULT_IMAGE = f"{_AGENT_IMAGE_PREFIX}/vab-openclaw:latest" if _AGENT_IMAGE_PREFIX else "vab-openclaw:latest"
+DEFAULT_IMAGE = f"{_AGENT_IMAGE_PREFIX}/vab-openclaw:latest" if _AGENT_IMAGE_PREFIX else "terrarium/openclaw:latest"
 TERRARIUM_DIR = "/vab-openclaw"
 SESSION_DIR = f"{TERRARIUM_DIR}/agents/main/sessions"
 CONFIG_PATH = f"{TERRARIUM_DIR}/openclaw.json"
