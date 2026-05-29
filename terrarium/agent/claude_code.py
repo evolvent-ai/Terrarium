@@ -1,6 +1,6 @@
 """Claude Code agent adapter.
 
-Runs Claude Code CLI inside a pre-built Docker container (vab-claude-code).
+Runs Claude Code CLI inside a pre-built Docker container (terrarium/claude-code).
 Multi-turn conversations use --session-id / --resume for continuity.
 Trajectory is parsed from the --output-format stream-json stdout.
 """
@@ -60,7 +60,7 @@ class ClaudeCodeAgent(BaseAgent):
     """Claude Code CLI agent running inside the workspace container.
 
     Requires a Docker image with Claude Code pre-installed.
-    Build with: docker build -t vab-claude-code -f docker/claude-code.Dockerfile docker/
+    Build with: docker build -t terrarium/claude-code -f docker/claude-code.Dockerfile docker/
     """
 
     def __init__(

@@ -1,6 +1,6 @@
 """Codex agent adapter.
 
-Runs OpenAI Codex CLI inside a pre-built Docker container (vab-codex).
+Runs OpenAI Codex CLI inside a pre-built Docker container (terrarium/codex).
 Multi-turn conversations use `codex exec resume <session_id>` for continuity.
 Trajectory is reconstructed from session JSONL files at
 ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl.
@@ -75,7 +75,7 @@ class CodexAgent(BaseAgent):
     """Codex CLI agent running inside the workspace container.
 
     Requires a Docker image with Codex pre-installed.
-    Build with: docker build -t vab-codex -f docker/codex.Dockerfile docker/
+    Build with: docker build -t terrarium/codex -f docker/codex.Dockerfile docker/
     """
 
     def __init__(

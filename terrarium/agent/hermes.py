@@ -1,6 +1,6 @@
 """Hermes agent adapter.
 
-Runs hermes-agent CLI inside a pre-built Docker container (vab-hermes).
+Runs hermes-agent CLI inside a pre-built Docker container (terrarium/hermes).
 Multi-turn conversations use `--resume <session_id>` for continuity.
 Trajectory is reconstructed from `hermes sessions export -` output.
 """
@@ -60,7 +60,7 @@ class HermesAgent(BaseAgent):
     """Hermes CLI agent running inside the workspace container.
 
     Requires a Docker image with hermes-agent pre-installed.
-    Build with: docker build -t vab-hermes -f docker/hermes.Dockerfile docker/
+    Build with: docker build -t terrarium/hermes -f docker/hermes.Dockerfile docker/
     """
 
     def __init__(
