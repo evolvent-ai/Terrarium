@@ -1,6 +1,6 @@
 """OpenClaw agent adapter.
 
-Runs OpenClaw CLI inside a pre-built Docker container (terrarium/openclaw).
+Runs OpenClaw CLI inside a pre-built Docker container (vab-openclaw).
 Multi-turn conversations use --session-id for continuity.
 Trajectory is reconstructed from session JSONL files
 at ~/.openclaw/agents/main/sessions/<sessionId>.jsonl.
@@ -31,8 +31,8 @@ from terrarium.models.trajectory import (
 
 import os as _os
 _AGENT_IMAGE_PREFIX = _os.environ.get("IMAGE_REGISTRY_PREFIX", "")
-DEFAULT_IMAGE = f"{_AGENT_IMAGE_PREFIX}/terrarium-openclaw:latest" if _AGENT_IMAGE_PREFIX else "terrarium/openclaw:latest"
-TERRARIUM_DIR = "/terrarium/openclaw"
+DEFAULT_IMAGE = f"{_AGENT_IMAGE_PREFIX}/vab-openclaw:latest" if _AGENT_IMAGE_PREFIX else "vab-openclaw:latest"
+TERRARIUM_DIR = "/vab-openclaw"
 SESSION_DIR = f"{TERRARIUM_DIR}/agents/main/sessions"
 CONFIG_PATH = f"{TERRARIUM_DIR}/openclaw.json"
 
@@ -58,7 +58,7 @@ class OpenClawAgent(BaseAgent):
     """OpenClaw CLI agent running inside the workspace container.
 
     Requires a Docker image with OpenClaw pre-installed.
-    Build with: docker build -t terrarium/openclaw -f docker/openclaw.Dockerfile docker/
+    Build with: docker build -t vab-openclaw -f docker/openclaw.Dockerfile docker/
     """
 
     def __init__(
