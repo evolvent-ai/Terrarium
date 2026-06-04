@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import os
 import posixpath
+import re
 import shlex
 import socket
 import socketserver
@@ -276,8 +277,10 @@ class KubernetesSandboxProvider(SandboxProvider):
 
     def create(self, spec: SandboxSpec) -> Sandbox:
         image_name = self._resolve_image(spec.image)
-        # sanitize for k8s pod/hostname
-        capability_name = spec.name.replace("_", "-").lower() if spec.name else uuid.uuid4().hex[:6]
+        if spec.name:
+            capability_name = re.sub(r"[^a-z0-9-]+", "-", spec.name.lower())
+        else:
+            capability_name = uuid.uuid4().hex[:6]
         pod_name = f"terrarium-{self._session_id}-{capability_name}"
 
         ports = [client.V1ContainerPort(container_port=p) for p in spec.ports]
@@ -335,18 +338,25 @@ class KubernetesSandboxProvider(SandboxProvider):
         except Exception as e:
             raise ProviderError(f"Failed to start pod {pod_name}: {e}") from e
 
-        deadline = time.monotonic() + 300.0
-        while True:
-            created = self._v1.read_namespaced_pod(name=pod_name, namespace=self._namespace)
-            phase = created.status.phase
-            if phase == "Running":
-                break
-            elif phase in ("Failed", "Succeeded", "Unknown"):
-                raise ProviderError(f"Pod {pod_name} reached terminal phase '{phase}'")
-            elif time.monotonic() > deadline:
-                raise ProviderError(f"Pod {pod_name} did not reach Running within 300s")
-            else:
-                time.sleep(0.5)
+        try:
+            deadline = time.monotonic() + 300.0
+            while True:
+                created = self._v1.read_namespaced_pod(name=pod_name, namespace=self._namespace)
+                phase = created.status.phase
+                if phase == "Running":
+                    break
+                elif phase in ("Failed", "Succeeded", "Unknown"):
+                    raise ProviderError(f"Pod {pod_name} reached terminal phase '{phase}'")
+                elif time.monotonic() > deadline:
+                    raise ProviderError(f"Pod {pod_name} did not reach Running within 300s")
+                else:
+                    time.sleep(0.5)
+        except Exception:
+            try:
+                self._v1.delete_namespaced_pod(name=pod_name, namespace=self._namespace, grace_period_seconds=0)
+            except Exception as e:
+                logger.warning("Failed to delete pod {} after startup failure: {}", pod_name, e)
+            raise
 
         sandbox = KubernetesSandbox(self._v1, created)
         self._sandboxes.append(sandbox)

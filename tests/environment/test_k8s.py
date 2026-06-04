@@ -297,6 +297,27 @@ class TestKubernetesSandboxProvider:
 
     @patch("terrarium.environment.providers.k8s.config")
     @patch("terrarium.environment.providers.k8s.client")
+    def test_create_sanitizes_capability_name_for_k8s(self, mock_client, mock_config):
+        v1 = MagicMock()
+        v1.read_namespaced_pod.return_value = _make_pod()
+        mock_client.CoreV1Api.return_value = v1
+
+        provider = KubernetesSandboxProvider(namespace="terrarium")
+        provider.setup()
+        provider.create(SandboxSpec(
+            name="workspace-dev:extra",
+            image=ImageSpec(name="alpine"),
+        ))
+
+        pod_spec_kwargs = mock_client.V1PodSpec.call_args.kwargs
+        assert pod_spec_kwargs["hostname"] == "workspace-dev-extra"
+
+        pod_meta_kwargs = mock_client.V1ObjectMeta.call_args_list[-1].kwargs
+        assert pod_meta_kwargs["name"] == f"terrarium-{provider._session_id}-workspace-dev-extra"
+        assert pod_meta_kwargs["labels"]["terrarium-capability"] == "workspace-dev-extra"
+
+    @patch("terrarium.environment.providers.k8s.config")
+    @patch("terrarium.environment.providers.k8s.client")
     def test_create_forwards_resources(self, mock_client, mock_config):
         v1 = MagicMock()
         v1.read_namespaced_pod.return_value = _make_pod()
@@ -324,7 +345,10 @@ class TestKubernetesSandboxProvider:
         provider = KubernetesSandboxProvider(namespace="terrarium")
         provider.setup()
         with pytest.raises(ProviderError, match="terminal phase"):
-            provider.create(SandboxSpec(image=ImageSpec(name="alpine")))
+            provider.create(SandboxSpec(name="default", image=ImageSpec(name="alpine")))
+        v1.delete_namespaced_pod.assert_called_once_with(
+            name=f"terrarium-{provider._session_id}-default", namespace="terrarium", grace_period_seconds=0,
+        )
 
     @patch("terrarium.environment.providers.k8s.config")
     @patch("terrarium.environment.providers.k8s.client")
