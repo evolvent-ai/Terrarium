@@ -44,6 +44,20 @@ class TestWorkspaceCapabilityUnit:
         spec = WorkspaceCapability.sandbox_spec({"env": {"FOO": "1", "BAR": "x"}})
         assert spec.env == {"FOO": "1", "BAR": "x"}
 
+    def test_sandbox_spec_forwards_volumes(self):
+        spec = WorkspaceCapability.sandbox_spec({
+            "volumes": [
+                {"source": "/tmp/data", "target": "/data"},
+                {"source": "/tmp/cache", "target": "/cache", "read_only": True},
+            ],
+        })
+        assert spec.volumes[0].source == "/tmp/data"
+        assert spec.volumes[0].target == "/data"
+        assert spec.volumes[0].read_only is False
+        assert spec.volumes[1].source == "/tmp/cache"
+        assert spec.volumes[1].target == "/cache"
+        assert spec.volumes[1].read_only is True
+
     def test_sandbox_spec_resources_default_empty(self):
         spec = WorkspaceCapability.sandbox_spec()
         assert spec.resources.cpus is None
