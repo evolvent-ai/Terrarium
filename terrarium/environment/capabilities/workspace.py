@@ -23,6 +23,7 @@ class WorkspaceCapability(BaseCapability):
         image:     ImageSpec dict (default: {"name": "ubuntu:24.04"})
         command:   Override container entrypoint (default: ["tail", "-f", "/dev/null"])
         env:       Environment variables for the container (default: {})
+        volumes:   Bind mounts for the container (default: [])
         resources: Container resource limits dict (default: {})
         workdir:   Default working directory inside the container (default: None)
     """
@@ -38,6 +39,7 @@ class WorkspaceCapability(BaseCapability):
             image=config.get("image") or {"name": DEFAULT_IMAGE},
             command=config.get("command", ["tail", "-f", "/dev/null"]),
             env=config.get("env", {}),
+            volumes=config.get("volumes", []),
             resources=config.get("resources", {}),
             workdir=config.get("workdir", None),
         )
