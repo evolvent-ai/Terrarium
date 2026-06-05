@@ -307,6 +307,7 @@ class KubernetesSandboxProvider(SandboxProvider):
         container = client.V1Container(
             name="main",
             image=image_name,
+            image_pull_policy="Always",
             args=args,
             env=env,
             ports=ports,
