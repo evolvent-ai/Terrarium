@@ -16,7 +16,7 @@ from pathlib import Path
 import tomli_w
 from loguru import logger
 
-from terrarium.agent.base import BaseAgent
+from terrarium.agent.base import BaseAgent, agent_image
 from terrarium.models.mcp import MCPServerConfig
 from terrarium.models.result import ActResult
 from terrarium.models.trajectory import (
@@ -30,7 +30,7 @@ from terrarium.models.trajectory import (
     TrajectoryMetrics,
 )
 
-DEFAULT_IMAGE = "terrarium/codex:latest"
+DEFAULT_IMAGE = agent_image("terrarium/codex:latest")
 TERRARIUM_DIR = "/terrarium/codex"
 SESSION_DIR = f"{TERRARIUM_DIR}/sessions"
 

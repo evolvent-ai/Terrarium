@@ -1,5 +1,6 @@
 """BaseAgent abstract interface."""
 from __future__ import annotations
+import os
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
@@ -9,6 +10,12 @@ if TYPE_CHECKING:
     from terrarium.models.mcp import MCPServerConfig
     from terrarium.models.result import ActResult
     from terrarium.models.trajectory import Trajectory
+
+
+def agent_image(name: str) -> str:
+    """Prefix a default agent image with IMAGE_REGISTRY_PREFIX when set."""
+    prefix = os.environ.get("IMAGE_REGISTRY_PREFIX", "").rstrip("/")
+    return f"{prefix}/{name}" if prefix else name
 
 
 class BaseAgent(ABC):

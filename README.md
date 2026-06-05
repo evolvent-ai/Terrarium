@@ -112,6 +112,23 @@ Bring your own agent by implementing `BaseAgent` and loading via import path:
 AgentConfig(name="my_agent", import_path="my_package.agent:MyAgent")
 ```
 
+## Sandbox Providers
+
+Capabilities and containerized agents run inside sandboxes provisioned by a `SandboxProvider`. Two backends are built in:
+
+
+| Provider | Backend                       | Notes                                                      |
+| -------- | ----------------------------- | ---------------------------------------------------------- |
+| `docker` | Local Docker daemon (default) | One container per sandbox on a per-session Docker network. |
+| `k8s`    | Kubernetes cluster            | One Pod per sandbox in a shared namespace.                 |
+
+
+Bring your own provider by implementing `SandboxProvider` and loading via import path:
+
+```python
+SandboxProviderConfig(import_path="my_package.providers:MyProvider", kwargs={...})
+```
+
 ## Benchmark Integration
 
 ### Writing a Task
@@ -394,7 +411,7 @@ def proactive_webhook(env, agent):
 
 - [ ] **More environment capabilities** — browser automation, Slack, MySQL/SQLite, cloud storage, and more
 - [ ] **More agent adapters** — Anthropic SDK, OpenAI, LangChain, local models, and others
-- [ ] **More sandbox providers** — support sandbox backends beyond Docker (e.g., cloud VMs, lightweight runtimes)
+- [ ] **More sandbox providers** — support sandbox backends beyond Docker and Kubernetes (e.g., cloud VMs, lightweight runtimes)
 - [ ] **Benchmark integrations** — integrate more existing benchmarks beyond tau2-bench
 - [ ] **CLI enhancements** — `terrarium init`, `terrarium validate`, result comparison, and richer output
 - [ ] **Execution engine** — async task submission, distributed execution, and scalable orchestration
