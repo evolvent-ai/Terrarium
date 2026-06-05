@@ -263,6 +263,7 @@ kwargs = { namespace = "terrarium" }
 |-------|------|---------|-------------|
 | `namespace` | str | (required) | Namespace pods are created in. Must exist; provider does not auto-create. |
 | `kubeconfig` | str | None | Path to a kubeconfig file. Falls back to `KUBECONFIG` env var or `~/.kube/config`. |
+| `image_pull_secrets` | list[str] | None | Kubernetes image pull secret names to attach to sandbox Pods. |
 
 **Custom provider** — implement any class extending `SandboxProvider`:
 
