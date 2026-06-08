@@ -318,6 +318,39 @@ class TestKubernetesSandboxProvider:
 
     @patch("terrarium.environment.providers.k8s.config")
     @patch("terrarium.environment.providers.k8s.client")
+    def test_create_sets_default_resource_requests(self, mock_client, mock_config):
+        v1 = MagicMock()
+        v1.read_namespaced_pod.return_value = _make_pod()
+        mock_client.CoreV1Api.return_value = v1
+
+        provider = KubernetesSandboxProvider(namespace="terrarium")
+        provider.setup()
+        provider.create(SandboxSpec(image=ImageSpec(name="alpine")))
+
+        resource_kwargs = mock_client.V1ResourceRequirements.call_args.kwargs
+        assert resource_kwargs["requests"] == {"cpu": "50m", "memory": "256Mi"}
+        assert resource_kwargs["limits"] == {}
+
+    @patch("terrarium.environment.providers.k8s.config")
+    @patch("terrarium.environment.providers.k8s.client")
+    def test_create_reads_default_resource_requests_from_env(self, mock_client, mock_config):
+        v1 = MagicMock()
+        v1.read_namespaced_pod.return_value = _make_pod()
+        mock_client.CoreV1Api.return_value = v1
+
+        provider = KubernetesSandboxProvider(namespace="terrarium")
+        provider.setup()
+        with patch.dict("os.environ", {
+            "K8S_DEFAULT_CPU_REQUEST": "100m",
+            "K8S_DEFAULT_MEM_REQUEST": "512Mi",
+        }):
+            provider.create(SandboxSpec(image=ImageSpec(name="alpine")))
+
+        requests = mock_client.V1ResourceRequirements.call_args.kwargs["requests"]
+        assert requests == {"cpu": "100m", "memory": "512Mi"}
+
+    @patch("terrarium.environment.providers.k8s.config")
+    @patch("terrarium.environment.providers.k8s.client")
     def test_create_forwards_resources(self, mock_client, mock_config):
         v1 = MagicMock()
         v1.read_namespaced_pod.return_value = _make_pod()
@@ -330,8 +363,16 @@ class TestKubernetesSandboxProvider:
             resources=ResourceLimits(cpus=1.5, memory="2G", storage="10G"),
         ))
 
-        limits = mock_client.V1ResourceRequirements.call_args.kwargs["limits"]
-        assert limits == {"cpu": "1.5", "memory": "2G", "ephemeral-storage": "10G"}
+        resource_kwargs = mock_client.V1ResourceRequirements.call_args.kwargs
+        assert resource_kwargs["requests"] == {
+            "cpu": "1.5",
+            "memory": "2G",
+        }
+        assert resource_kwargs["limits"] == {
+            "cpu": "1.5",
+            "memory": "2G",
+            "ephemeral-storage": "10G",
+        }
 
     @patch("terrarium.environment.providers.k8s.config")
     @patch("terrarium.environment.providers.k8s.client")
