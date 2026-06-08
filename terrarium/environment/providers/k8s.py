@@ -296,13 +296,8 @@ class KubernetesSandboxProvider(SandboxProvider):
         elif isinstance(spec.command, list):
             args = spec.command
 
-        # Always emit resource *requests* so sandbox pods are Burstable, not
-        # BestEffort. Without a memory request the scheduler packs pods onto one
-        # node which then OOM-kills them (exit 137); a default floor lets it
-        # reserve memory and spread pods across nodes. Capabilities that set
-        # spec.resources get request==limit. See issue #51.
-        default_cpu_req = os.environ.get("SANDBOX_CPU_REQUEST", "50m")
-        default_mem_req = os.environ.get("SANDBOX_MEM_REQUEST", "256Mi")
+        default_cpu_req = os.environ.get("K8S_DEFAULT_CPU_REQUEST", "50m")
+        default_mem_req = os.environ.get("K8S_DEFAULT_MEM_REQUEST", "256Mi")
         requests: dict[str, str] = {"cpu": default_cpu_req, "memory": default_mem_req}
         limits: dict[str, str] = {}
         if spec.resources.cpus is not None:
@@ -321,7 +316,7 @@ class KubernetesSandboxProvider(SandboxProvider):
             ports=ports,
             resources=client.V1ResourceRequirements(
                 requests=requests,
-                limits=limits or None,
+                limits=limits,
             ),
             working_dir=spec.workdir,
         )
