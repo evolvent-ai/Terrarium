@@ -63,10 +63,12 @@ class OpenClawAgent(BaseAgent):
         self,
         model: str = "anthropic/claude-sonnet-4-6",
         models_config_path: str = "",
+        agent_defaults: dict = {},
         system_prompt: str | None = None,
     ):
         self._model = model
         self._models_config = json.loads(Path(models_config_path).read_text())
+        self._agent_defaults = agent_defaults
         self._system_prompt: str | None = system_prompt
 
         self._workspace = None
@@ -216,6 +218,7 @@ class OpenClawAgent(BaseAgent):
                 "defaults": {
                     "workspace": f"{TERRARIUM_DIR}/workspace",
                     "model": {"primary": self._model},
+                    **self._agent_defaults,
                 },
             },
             "tools": {
