@@ -217,6 +217,34 @@ class TestSetup:
         assert config["tools"]["exec"]["security"] == "full"
         assert "systemPromptOverride" not in config["agents"]["defaults"]
 
+    def test_agents_defaults_config_merged_into_config(self, models_config):
+        """agents_defaults_config is merged verbatim into config agents.defaults."""
+        agent = OpenClawAgent(
+            model="mycloud/deepseek-v4-pro",
+            models_config_path=models_config,
+            agents_defaults_config={"thinkingDefault": "xhigh"},
+        )
+        workspace = _FakeWorkspace(shell_responses=[
+            _FakeExecResult(exit_code=0),
+            _FakeExecResult(exit_code=0, stdout="/usr/local/bin/openclaw"),
+            _FakeExecResult(stdout="openclaw version 2026.4.1"),
+        ])
+        agent.setup(workspace, {})
+
+        config = json.loads(workspace.fs.write_file_calls[-1][1])
+        defaults = config["agents"]["defaults"]
+        assert defaults["thinkingDefault"] == "xhigh"
+        # Base keys are still present alongside the merged overrides.
+        assert defaults["model"]["primary"] == "mycloud/deepseek-v4-pro"
+        assert defaults["workspace"] == f"{TERRARIUM_DIR}/workspace"
+
+    def test_no_agents_defaults_config_leaves_config_unchanged(self, models_config):
+        """Without agents_defaults_config, no extra keys leak into agents.defaults."""
+        agent, workspace = _make_agent(models_config)
+        agent.setup(workspace, {})
+        config = json.loads(workspace.fs.write_file_calls[-1][1])
+        assert set(config["agents"]["defaults"]) == {"workspace", "model"}
+
     def test_system_prompt_setter_rewrites_config(self, models_config):
         """Setting system_prompt after setup re-writes config with systemPromptOverride."""
         agent, workspace = _make_agent(models_config)
