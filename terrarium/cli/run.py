@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import signal
 import sys
 import tomllib
 from collections import deque
@@ -20,6 +21,17 @@ from terrarium.cli.utils import console, print_error
 from terrarium.execution.events import JobEvent, JobEventPayload, TrialEvent, TrialEventPayload
 from terrarium.execution.job import Job
 from terrarium.models.config import JobConfig
+
+
+async def _run_job(job: Job):
+    loop = asyncio.get_running_loop()
+    task = asyncio.create_task(job.run())
+    loop.add_signal_handler(signal.SIGTERM, task.cancel)
+
+    try:
+        return await task
+    finally:
+        loop.remove_signal_handler(signal.SIGTERM)
 
 
 class _LogPanel:
@@ -146,7 +158,7 @@ def run_command(
     # Run with live progress UI
     job = Job(job_config)
     with _ProgressUI(job):
-        job_result = asyncio.run(job.run())
+        job_result = asyncio.run(_run_job(job))
 
     # Results table
     table = Table(show_header=True, header_style="bold", box=None, padding=(0, 2), pad_edge=False, expand=True)
