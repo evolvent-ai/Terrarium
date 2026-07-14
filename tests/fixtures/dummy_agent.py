@@ -46,7 +46,7 @@ class DummyAgent(BaseAgent):
             metrics=TrajectoryMetrics(
                 total_input_tokens=0,
                 total_output_tokens=0,
-                total_llm_calls=0,
+                total_turns=0,
                 total_tool_calls=0,
             ),
         )

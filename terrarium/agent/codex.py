@@ -197,7 +197,7 @@ class CodexAgent(BaseAgent):
                 total_input_tokens=total_input or None,
                 total_output_tokens=total_output or None,
                 total_cache_read_tokens=total_cache_read or None,
-                total_llm_calls=len(self._act_results) or None,
+                total_turns=len(self._act_results) or None,
                 total_tool_calls=total_tool_calls or None,
             ),
         )

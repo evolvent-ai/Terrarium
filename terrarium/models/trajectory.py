@@ -51,9 +51,8 @@ class TrajectoryMetrics(BaseModel):
     total_output_tokens: int | None = None
     total_cache_read_tokens: int | None = None
     total_cache_creation_tokens: int | None = None
-    total_llm_calls: int | None = None
+    total_turns: int | None = None
     total_tool_calls: int | None = None
-    total_duration_sec: float | None = None
 
 
 class Trajectory(BaseModel):

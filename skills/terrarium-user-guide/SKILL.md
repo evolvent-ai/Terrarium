@@ -366,7 +366,7 @@ Each trial produces a `TrialResult`:
 | `checker_result.score` | 0.0–1.0, fraction of checks passed |
 | `checker_result.checks` | Individual check names, pass/fail, and tags |
 | `trajectory.messages` | All messages exchanged (user instructions, agent responses, tool calls) |
-| `trajectory.metrics` | Token usage (input, output, cache read/creation), LLM calls, tool calls |
+| `trajectory.metrics` | Token usage (input, output, cache read/creation), agent turns, tool calls |
 | `exception_info` | Error details if the trial failed (treated as score 0.0 in metrics) |
 | `timing` | Wall-clock duration for the entire trial |
 | `setup_timing` | Duration for agent setup phase |

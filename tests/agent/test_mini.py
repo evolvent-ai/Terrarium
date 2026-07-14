@@ -302,7 +302,7 @@ class TestTrajectory:
         assert len(traj.messages) == 4  # 2 user + 2 assistant
         assert traj.metrics.total_input_tokens == 12
         assert traj.metrics.total_output_tokens == 5
-        assert traj.metrics.total_llm_calls == 2
+        assert traj.metrics.total_turns == 2
 
     def test_counts_tool_calls(self):
         def foo():

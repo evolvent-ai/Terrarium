@@ -336,7 +336,7 @@ class TestAct:
 
         traj = agent.get_trajectory()
         assert traj.metrics.total_tool_calls == 2
-        assert traj.metrics.total_llm_calls == 1
+        assert traj.metrics.total_turns == 1
 
     def test_multi_turn_incremental(self, models_config):
         """Multiple act() calls only read new session entries."""
