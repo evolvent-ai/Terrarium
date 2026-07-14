@@ -90,7 +90,7 @@ class TestTrajectory:
     def test_with_metrics(self):
         t = Trajectory(
             messages=[Message(role="user", content="hi")],
-            metrics=TrajectoryMetrics(total_input_tokens=100, total_llm_calls=1),
+            metrics=TrajectoryMetrics(total_input_tokens=100, total_turns=1),
         )
         assert t.metrics.total_input_tokens == 100
 
@@ -110,4 +110,4 @@ class TestTrajectory:
     def test_metrics_defaults(self):
         m = TrajectoryMetrics()
         assert m.total_input_tokens is None
-        assert m.total_llm_calls is None
+        assert m.total_turns is None

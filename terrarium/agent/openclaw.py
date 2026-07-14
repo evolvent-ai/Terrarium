@@ -200,7 +200,7 @@ class OpenClawAgent(BaseAgent):
                 total_output_tokens=total_output or None,
                 total_cache_read_tokens=total_cache_read or None,
                 total_cache_creation_tokens=total_cache_creation or None,
-                total_llm_calls=len(self._act_results) or None,
+                total_turns=len(self._act_results) or None,
                 total_tool_calls=total_tool_calls or None,
             ),
         )
@@ -336,5 +336,4 @@ def _parse_session_message(msg: dict) -> Message | None:
             ))
 
     return Message(role=role, content=blocks) if blocks else None
-
 

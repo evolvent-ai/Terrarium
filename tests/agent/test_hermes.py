@@ -362,7 +362,7 @@ class TestAct:
 
         traj = agent.get_trajectory()
         assert traj.metrics.total_tool_calls == 1
-        assert traj.metrics.total_llm_calls == 1
+        assert traj.metrics.total_turns == 1
 
     def test_raises_on_empty_export(self, model_config):
         """If sessions export returns empty stdout, act() raises (can't get session id)."""
