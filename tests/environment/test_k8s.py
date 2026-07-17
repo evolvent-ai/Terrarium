@@ -275,6 +275,29 @@ class TestKubernetesSandboxProvider:
 
     @patch("terrarium.environment.providers.k8s.config")
     @patch("terrarium.environment.providers.k8s.client")
+    def test_create_owns_pod_with_session_service(self, mock_client, mock_config):
+        v1 = MagicMock()
+        v1.create_namespaced_service.return_value.metadata.uid = "svc-uid-123"
+        v1.read_namespaced_pod.return_value = _make_pod()
+        mock_client.CoreV1Api.return_value = v1
+
+        provider = KubernetesSandboxProvider(namespace="terrarium")
+        provider.setup()
+        provider.create(SandboxSpec(name="postgres", image=ImageSpec(name="postgres:16")))
+
+        # The Service uid captured at setup() is used to own the pod.
+        owner_kwargs = mock_client.V1OwnerReference.call_args.kwargs
+        assert owner_kwargs["kind"] == "Service"
+        assert owner_kwargs["name"] == f"terrarium-{provider._session_id}"
+        assert owner_kwargs["uid"] == "svc-uid-123"
+        assert owner_kwargs["controller"] is False
+        assert owner_kwargs["block_owner_deletion"] is False
+
+        pod_meta_kwargs = mock_client.V1ObjectMeta.call_args_list[-1].kwargs
+        assert pod_meta_kwargs["owner_references"] == [mock_client.V1OwnerReference.return_value]
+
+    @patch("terrarium.environment.providers.k8s.config")
+    @patch("terrarium.environment.providers.k8s.client")
     def test_create_sets_hostname_subdomain_and_labels(self, mock_client, mock_config):
         v1 = MagicMock()
         v1.read_namespaced_pod.return_value = _make_pod()

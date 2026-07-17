@@ -239,6 +239,7 @@ class KubernetesSandboxProvider(SandboxProvider):
         self._image_pull_secrets = image_pull_secrets
         self._sandboxes: list[KubernetesSandbox] = []
         self._session_id = uuid.uuid4().hex[:12]
+        self._service_uid: str | None = None
 
     def setup(self) -> None:
         try:
@@ -271,9 +272,15 @@ class KubernetesSandboxProvider(SandboxProvider):
             ),
         )
         try:
-            self._v1.create_namespaced_service(namespace=self._namespace, body=svc)
+            created_svc = self._v1.create_namespaced_service(namespace=self._namespace, body=svc)
         except Exception as e:
             raise ProviderError(f"Failed to create session Service: {e}") from e
+
+        # Own every sandbox pod with this Service so the Kubernetes garbage
+        # collector reclaims them when the Service is deleted — even if this
+        # process is SIGKILLed (OOM / eviction / node loss) and teardown() never
+        # runs. Bare pods (no ownerReference) would leak permanently in that case.
+        self._service_uid = created_svc.metadata.uid
 
     def create(self, spec: SandboxSpec) -> Sandbox:
         image_name = self._resolve_image(spec.image)
@@ -320,6 +327,21 @@ class KubernetesSandboxProvider(SandboxProvider):
             ),
             working_dir=spec.workdir,
         )
+        owner_references = None
+        if self._service_uid is not None:
+            owner_references = [
+                client.V1OwnerReference(
+                    api_version="v1",
+                    kind="Service",
+                    name=f"terrarium-{self._session_id}",
+                    uid=self._service_uid,
+                    # The pod does not block deletion of its owning Service, and
+                    # the Service is not a controller of the pod — this is a pure
+                    # GC ownership link, not a managed-by relationship.
+                    block_owner_deletion=False,
+                    controller=False,
+                )
+            ]
         pod = client.V1Pod(
             metadata=client.V1ObjectMeta(
                 name=pod_name,
@@ -327,6 +349,7 @@ class KubernetesSandboxProvider(SandboxProvider):
                     "terrarium-session": self._session_id,
                     "terrarium-capability": capability_name,
                 },
+                owner_references=owner_references,
             ),
             spec=client.V1PodSpec(
                 hostname=capability_name,
